@@ -1,0 +1,102 @@
+import { RoleCode } from './enums';
+
+export const PERMISSIONS = {
+  PATIENTS_READ: 'patients:read',
+  PATIENTS_WRITE: 'patients:write',
+  PATIENTS_DELETE: 'patients:delete',
+  MEDICAL_READ: 'medical:read',
+  MEDICAL_WRITE: 'medical:write',
+  FILES_READ: 'files:read',
+  FILES_WRITE: 'files:write',
+  FILES_DELETE: 'files:delete',
+  APPOINTMENTS_READ: 'appointments:read',
+  APPOINTMENTS_WRITE: 'appointments:write',
+  APPOINTMENTS_MANAGE_ALL: 'appointments:manage_all',
+  SERVICES_READ: 'services:read',
+  SERVICES_WRITE: 'services:write',
+  STAFF_READ: 'staff:read',
+  STAFF_WRITE: 'staff:write',
+  ROLES_ASSIGN: 'roles:assign',
+  FINANCE_READ: 'finance:read',
+  FINANCE_WRITE: 'finance:write',
+  FINANCE_REFUND: 'finance:refund',
+  ANALYTICS_READ: 'analytics:read',
+  ANALYTICS_OWN: 'analytics:own',
+  AUDIT_READ: 'audit:read',
+  ACTIVITY_READ: 'activity:read',
+  SETTINGS_READ: 'settings:read',
+  SETTINGS_WRITE: 'settings:write',
+  ORGANIZATION_WRITE: 'organization:write',
+} as const;
+
+export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
+
+export const ROLE_PERMISSIONS: Record<RoleCode, Permission[]> = {
+  [RoleCode.ADMIN]: Object.values(PERMISSIONS),
+  [RoleCode.DOCTOR]: [
+    PERMISSIONS.PATIENTS_READ,
+    PERMISSIONS.PATIENTS_WRITE,
+    PERMISSIONS.MEDICAL_READ,
+    PERMISSIONS.MEDICAL_WRITE,
+    PERMISSIONS.FILES_READ,
+    PERMISSIONS.FILES_WRITE,
+    PERMISSIONS.APPOINTMENTS_READ,
+    PERMISSIONS.APPOINTMENTS_WRITE,
+    PERMISSIONS.SERVICES_READ,
+    PERMISSIONS.ANALYTICS_OWN,
+  ],
+  [RoleCode.MASSAGE_THERAPIST]: [
+    PERMISSIONS.PATIENTS_READ,
+    PERMISSIONS.PATIENTS_WRITE,
+    PERMISSIONS.MEDICAL_READ,
+    PERMISSIONS.MEDICAL_WRITE,
+    PERMISSIONS.FILES_READ,
+    PERMISSIONS.FILES_WRITE,
+    PERMISSIONS.APPOINTMENTS_READ,
+    PERMISSIONS.APPOINTMENTS_WRITE,
+    PERMISSIONS.SERVICES_READ,
+    PERMISSIONS.ANALYTICS_OWN,
+  ],
+  [RoleCode.MANAGER]: [
+    PERMISSIONS.PATIENTS_READ,
+    PERMISSIONS.PATIENTS_WRITE,
+    PERMISSIONS.FILES_READ,
+    PERMISSIONS.FILES_WRITE,
+    PERMISSIONS.APPOINTMENTS_READ,
+    PERMISSIONS.APPOINTMENTS_WRITE,
+    PERMISSIONS.APPOINTMENTS_MANAGE_ALL,
+    PERMISSIONS.SERVICES_READ,
+    PERMISSIONS.SERVICES_WRITE,
+    PERMISSIONS.STAFF_READ,
+    PERMISSIONS.STAFF_WRITE,
+    PERMISSIONS.ROLES_ASSIGN,
+    PERMISSIONS.FINANCE_READ,
+    PERMISSIONS.FINANCE_WRITE,
+    PERMISSIONS.FINANCE_REFUND,
+    PERMISSIONS.ANALYTICS_READ,
+    PERMISSIONS.AUDIT_READ,
+    PERMISSIONS.ACTIVITY_READ,
+    PERMISSIONS.SETTINGS_READ,
+  ],
+  [RoleCode.FINANCE]: [
+    PERMISSIONS.PATIENTS_READ,
+    PERMISSIONS.FINANCE_READ,
+    PERMISSIONS.FINANCE_WRITE,
+    PERMISSIONS.FINANCE_REFUND,
+    PERMISSIONS.ANALYTICS_READ,
+  ],
+};
+
+export function getPermissionsForRoles(roles: RoleCode[]): Permission[] {
+  const set = new Set<Permission>();
+  for (const role of roles) {
+    for (const p of ROLE_PERMISSIONS[role] ?? []) {
+      set.add(p);
+    }
+  }
+  return [...set];
+}
+
+export function hasPermission(roles: RoleCode[], permission: Permission): boolean {
+  return getPermissionsForRoles(roles).includes(permission);
+}

@@ -1,0 +1,193 @@
+import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  TreatmentPlanStatus,
+  VisitStatus,
+} from '@prisma/client';
+import { Prisma } from '@prisma/client';
+import { PrismaService } from '../../database/prisma.service';
+
+@Injectable()
+export class MedicalRecordsService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async getByPatient(organizationId: string, patientId: string) {
+    const record = await this.prisma.medicalRecord.findFirst({
+      where: {
+        organizationId,
+        patientId,
+        patient: { deletedAt: null },
+      },
+      include: {
+        patient: true,
+        visits: {
+          orderBy: { visitedAt: 'desc' },
+          include: {
+            staff: { select: { id: true, firstName: true, lastName: true } },
+            diagnoses: true,
+            recommendations: true,
+            measurements: true,
+          },
+        },
+        treatmentPlans: {
+          orderBy: { createdAt: 'desc' },
+          include: {
+            staff: { select: { id: true, firstName: true, lastName: true } },
+          },
+        },
+      },
+    });
+    if (!record) throw new NotFoundException('Medical record not found');
+    return record;
+  }
+
+  async createVisit(
+    organizationId: string,
+    medicalRecordId: string,
+    userId: string,
+    data: {
+      staffId: string;
+      branchId: string;
+      visitedAt: string;
+      chiefComplaint?: string;
+      anamnesis?: string;
+      clinicalNotes?: string;
+      prescriptions?: string;
+      status?: VisitStatus;
+      appointmentId?: string;
+    },
+  ) {
+    return this.prisma.visit.create({
+      data: {
+        organizationId,
+        medicalRecordId,
+        staffId: data.staffId,
+        branchId: data.branchId,
+        visitedAt: new Date(data.visitedAt),
+        chiefComplaint: data.chiefComplaint,
+        anamnesis: data.anamnesis,
+        clinicalNotes: data.clinicalNotes,
+        prescriptions: data.prescriptions,
+        status: data.status ?? VisitStatus.PLANNED,
+        appointmentId: data.appointmentId,
+        createdBy: userId,
+      },
+      include: { diagnoses: true, recommendations: true, measurements: true },
+    });
+  }
+
+  async updateVisit(
+    organizationId: string,
+    visitId: string,
+    data: Prisma.VisitUpdateInput,
+  ) {
+    await this.ensureVisit(organizationId, visitId);
+    return this.prisma.visit.update({
+      where: { id: visitId },
+      data,
+      include: { diagnoses: true, recommendations: true, measurements: true },
+    });
+  }
+
+  async deleteVisit(organizationId: string, visitId: string) {
+    await this.ensureVisit(organizationId, visitId);
+    await this.prisma.visit.delete({ where: { id: visitId } });
+    return { success: true };
+  }
+
+  async addDiagnosis(
+    organizationId: string,
+    visitId: string,
+    userId: string,
+    data: { icdCode?: string; title: string; description?: string; isPrimary?: boolean },
+  ) {
+    await this.ensureVisit(organizationId, visitId);
+    return this.prisma.diagnosis.create({
+      data: { visitId, ...data, createdBy: userId },
+    });
+  }
+
+  async addRecommendation(
+    organizationId: string,
+    visitId: string,
+    userId: string,
+    data: { content: string; followUpDate?: string },
+  ) {
+    await this.ensureVisit(organizationId, visitId);
+    return this.prisma.recommendation.create({
+      data: {
+        visitId,
+        content: data.content,
+        followUpDate: data.followUpDate ? new Date(data.followUpDate) : undefined,
+        createdBy: userId,
+      },
+    });
+  }
+
+  async addMeasurement(
+    organizationId: string,
+    visitId: string,
+    userId: string,
+    data: { type: string; unit?: string; value: number; notes?: string; measuredAt: string },
+  ) {
+    await this.ensureVisit(organizationId, visitId);
+    return this.prisma.measurement.create({
+      data: {
+        visitId,
+        type: data.type,
+        unit: data.unit,
+        value: data.value,
+        notes: data.notes,
+        measuredAt: new Date(data.measuredAt),
+        measuredBy: userId,
+      },
+    });
+  }
+
+  async createTreatmentPlan(
+    organizationId: string,
+    medicalRecordId: string,
+    userId: string,
+    data: {
+      staffId: string;
+      title: string;
+      description?: string;
+      startDate?: string;
+      endDate?: string;
+      status?: TreatmentPlanStatus;
+    },
+  ) {
+    return this.prisma.treatmentPlan.create({
+      data: {
+        organizationId,
+        medicalRecordId,
+        staffId: data.staffId,
+        title: data.title,
+        description: data.description,
+        startDate: data.startDate ? new Date(data.startDate) : undefined,
+        endDate: data.endDate ? new Date(data.endDate) : undefined,
+        status: data.status ?? TreatmentPlanStatus.DRAFT,
+        createdBy: userId,
+      },
+    });
+  }
+
+  async updateTreatmentPlan(
+    organizationId: string,
+    planId: string,
+    data: Prisma.TreatmentPlanUpdateInput,
+  ) {
+    const plan = await this.prisma.treatmentPlan.findFirst({
+      where: { id: planId, organizationId },
+    });
+    if (!plan) throw new NotFoundException('Treatment plan not found');
+    return this.prisma.treatmentPlan.update({ where: { id: planId }, data });
+  }
+
+  private async ensureVisit(organizationId: string, visitId: string) {
+    const visit = await this.prisma.visit.findFirst({
+      where: { id: visitId, organizationId },
+    });
+    if (!visit) throw new NotFoundException('Visit not found');
+    return visit;
+  }
+}

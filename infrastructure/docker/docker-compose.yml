@@ -1,0 +1,23 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: integra-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: integra
+      POSTGRES_PASSWORD: integra
+      POSTGRES_DB: integra
+    ports:
+      - "5432:5432"
+    volumes:
+      - integra_pg_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: integra-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
+volumes:
+  integra_pg_data:
