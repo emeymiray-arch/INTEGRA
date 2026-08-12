@@ -63,13 +63,16 @@ integra/
 
 ## Деплой на Vercel (frontend)
 
-В настройках проекта Vercel:
+Рекомендуемые настройки проекта:
 
-1. **Root Directory:** `.` (корень репозитория)
+1. **Root Directory:** `.` (корень репозитория) — предпочтительно
+   - или `apps/web`
 2. **Framework Preset:** Other
-3. **Build Command / Output:** берутся из `vercel.json` (`@integra/web` → `apps/web/dist`)
+3. Build/Output берутся из `vercel.json`
 
-NestJS API (`@integra/api`) на Vercel как SPA не деплоится — нужен отдельный хостинг (Railway / Render / Fly) или serverless-адаптер. Для API в build всегда выполняется `prisma generate`.
+Сборка идёт через `infrastructure/scripts/vercel-build-web.sh` и публикует статику в `dist`.
+
+NestJS API (`@integra/api`) на Vercel как SPA не деплоится — нужен отдельный хостинг (Railway / Render / Fly). Для API в build всегда выполняется `prisma generate`.
 
 ## Документация
 
