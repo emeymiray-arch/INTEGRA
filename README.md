@@ -61,6 +61,16 @@ integra/
 | `pnpm db:seed` | Начальные данные INTEGRA |
 | `pnpm db:studio` | Prisma Studio |
 
+## Деплой на Vercel (frontend)
+
+В настройках проекта Vercel:
+
+1. **Root Directory:** `.` (корень репозитория)
+2. **Framework Preset:** Other
+3. **Build Command / Output:** берутся из `vercel.json` (`@integra/web` → `apps/web/dist`)
+
+NestJS API (`@integra/api`) на Vercel как SPA не деплоится — нужен отдельный хостинг (Railway / Render / Fly) или serverless-адаптер. Для API в build всегда выполняется `prisma generate`.
+
 ## Документация
 
 - [Архитектура v2.0](docs/ARCHITECTURE.md)
