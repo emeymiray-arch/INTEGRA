@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "installCommand": "pnpm install",
-  "buildCommand": "pnpm turbo build --filter=@integra/web && rm -rf dist && cp -R apps/web/dist dist",
+  "installCommand": "cd ../.. && pnpm install",
+  "buildCommand": "cd ../.. && pnpm turbo build --filter=@integra/web",
   "outputDirectory": "dist",
   "framework": null,
   "rewrites": [

@@ -8,3 +8,5 @@ dist
 uploads
 coverage
 .prisma
+apps/*/dist
+packages/*/dist
