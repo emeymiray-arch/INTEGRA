@@ -4,6 +4,7 @@ import { AuthLayout } from '@/app/layouts/AuthLayout';
 import { AppLayout } from '@/app/layouts/AppLayout';
 import { GuestRoute, ProtectedRoute } from '@/app/routes/ProtectedRoute';
 import { LoginPage } from '@/features/auth/LoginPage';
+import { RegisterPage } from '@/features/auth/RegisterPage';
 import { DashboardPage } from '@/features/dashboard/DashboardPage';
 import { PatientsPage } from '@/features/patients/PatientsPage';
 import { PatientDetailPage } from '@/features/patients/PatientDetailPage';
@@ -22,6 +23,7 @@ export function App() {
           <Route element={<GuestRoute />}>
             <Route element={<AuthLayout />}>
               <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
             </Route>
           </Route>
 

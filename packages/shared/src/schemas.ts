@@ -9,9 +9,25 @@ import {
 } from './enums';
 
 export const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(6),
+  email: z.string().email('Некорректный email'),
+  password: z.string().min(6, 'Минимум 6 символов'),
 });
+
+export const registerSchema = z
+  .object({
+    email: z.string().email('Некорректный email'),
+    password: z.string().min(6, 'Минимум 6 символов'),
+    confirmPassword: z.string().min(6, 'Минимум 6 символов'),
+    firstName: z.string().min(1, 'Укажите имя'),
+    lastName: z.string().min(1, 'Укажите фамилию'),
+    middleName: z.string().optional(),
+    phone: z.string().optional(),
+    organizationName: z.string().min(2, 'Укажите название центра'),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: 'Пароли не совпадают',
+    path: ['confirmPassword'],
+  });
 
 export const emergencyContactSchema = z.object({
   name: z.string().min(1),
@@ -96,6 +112,7 @@ export const paginationSchema = z.object({
 });
 
 export type LoginInput = z.infer<typeof loginSchema>;
+export type RegisterInput = z.infer<typeof registerSchema>;
 export type CreatePatientInput = z.infer<typeof createPatientSchema>;
 export type CreateStaffInput = z.infer<typeof createStaffSchema>;
 export type CreateAppointmentInput = z.infer<typeof createAppointmentSchema>;

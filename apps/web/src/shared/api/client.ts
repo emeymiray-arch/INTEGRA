@@ -52,11 +52,15 @@ apiClient.interceptors.response.use(
     isRefreshing = true;
 
     try {
-      const { data } = await axios.post(`${API_BASE}/auth/refresh`, {
+      const { data: body } = await axios.post(`${API_BASE}/auth/refresh`, {
         refreshToken,
       });
-      const newAccess = data.accessToken as string;
-      const newRefresh = data.refreshToken as string;
+      const payload = (body?.data ?? body) as {
+        accessToken: string;
+        refreshToken: string;
+      };
+      const newAccess = payload.accessToken;
+      const newRefresh = payload.refreshToken;
       setTokens(newAccess, newRefresh);
       processQueue(newAccess);
       original.headers.Authorization = `Bearer ${newAccess}`;

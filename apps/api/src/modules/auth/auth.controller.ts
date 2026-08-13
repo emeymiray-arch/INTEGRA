@@ -16,6 +16,35 @@ class LoginDto {
   password!: string;
 }
 
+class RegisterDto {
+  @IsEmail()
+  email!: string;
+
+  @IsString()
+  @MinLength(6)
+  password!: string;
+
+  @IsString()
+  @MinLength(1)
+  firstName!: string;
+
+  @IsString()
+  @MinLength(1)
+  lastName!: string;
+
+  @IsOptional()
+  @IsString()
+  middleName?: string;
+
+  @IsOptional()
+  @IsString()
+  phone?: string;
+
+  @IsString()
+  @MinLength(2)
+  organizationName!: string;
+}
+
 class RefreshDto {
   @IsString()
   refreshToken!: string;
@@ -31,6 +60,23 @@ class LogoutDto {
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
+
+  @Post('register')
+  register(@Body() dto: RegisterDto, @Req() req: Request) {
+    return this.authService.register(
+      {
+        email: dto.email,
+        password: dto.password,
+        firstName: dto.firstName,
+        lastName: dto.lastName,
+        middleName: dto.middleName,
+        phone: dto.phone,
+        organizationName: dto.organizationName,
+      },
+      req.headers['user-agent'],
+      req.ip,
+    );
+  }
 
   @Post('login')
   login(@Body() dto: LoginDto, @Req() req: Request) {

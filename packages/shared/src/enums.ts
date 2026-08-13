@@ -128,6 +128,7 @@ export enum FileEntityType {
 export const ACTIVITY_EVENTS = {
   AUTH_LOGIN: 'auth.login',
   AUTH_LOGOUT: 'auth.logout',
+  AUTH_REGISTER: 'auth.register',
   PATIENT_CREATED: 'patient.created',
   PATIENT_UPDATED: 'patient.updated',
   DOCUMENT_UPLOADED: 'document.uploaded',

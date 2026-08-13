@@ -1,11 +1,27 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { loginSchema, type LoginInput } from '@integra/shared';
 import { Button, Card, Input } from '@integra/ui';
 import { apiClient } from '@/shared/api/client';
+import { unwrapData } from '@/shared/api/unwrap';
 import { useAuthStore } from '@/shared/stores/authStore';
+
+type AuthResponse = {
+  accessToken: string;
+  refreshToken: string;
+  user: { id: string; email: string; isActive: boolean };
+  staff: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    middleName?: string;
+    avatarUrl?: string;
+    specialization?: string;
+  };
+  permissions: string[];
+};
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -23,7 +39,7 @@ export function LoginPage() {
   const loginMutation = useMutation({
     mutationFn: async (data: LoginInput) => {
       const res = await apiClient.post('/auth/login', data);
-      return res.data;
+      return unwrapData<AuthResponse>(res.data);
     },
     onSuccess: (data) => {
       setAuth({
@@ -81,6 +97,13 @@ export function LoginPage() {
           Войти
         </Button>
       </form>
+
+      <p className="mt-6 text-center text-sm text-integra-gray-600">
+        Нет аккаунта?{' '}
+        <Link to="/register" className="font-medium text-primary hover:text-primary-light">
+          Зарегистрировать центр
+        </Link>
+      </p>
     </Card>
   );
 }

@@ -1,16 +1,33 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import {
   ACTIVITY_EVENTS,
   getPermissionsForRoles,
+  PERMISSIONS,
+  ROLE_PERMISSIONS,
   RoleCode,
 } from '@integra/shared';
 import * as bcrypt from 'bcrypt';
 import { createHash, randomBytes } from 'crypto';
+import { PaymentMethodType } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { ActivityService } from '../../common/services/activity.service';
 import { AuthUser, JwtPayload } from '../../common/types/auth-user.interface';
+
+export interface RegisterInput {
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+  middleName?: string;
+  phone?: string;
+  organizationName: string;
+}
 
 @Injectable()
 export class AuthService {
@@ -21,9 +38,123 @@ export class AuthService {
     private readonly activity: ActivityService,
   ) {}
 
+  async register(input: RegisterInput, userAgent?: string, ipAddress?: string) {
+    const email = input.email.trim().toLowerCase();
+    const existingUser = await this.prisma.user.findUnique({ where: { email } });
+    if (existingUser) {
+      throw new ConflictException('Пользователь с таким email уже зарегистрирован');
+    }
+
+    const slug = this.slugify(input.organizationName);
+    const existingOrg = await this.prisma.organization.findUnique({ where: { slug } });
+    if (existingOrg) {
+      throw new ConflictException(
+        'Организация с таким названием уже существует. Войдите или выберите другое название.',
+      );
+    }
+
+    await this.ensureSystemRoles();
+
+    const passwordHash = await bcrypt.hash(input.password, 12);
+    const adminRole = await this.prisma.role.findUniqueOrThrow({
+      where: { code: RoleCode.ADMIN },
+    });
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const organization = await tx.organization.create({
+        data: {
+          name: input.organizationName.trim(),
+          slug,
+          settings: {
+            locale: 'ru-RU',
+            currency: 'RUB',
+            timezone: 'Europe/Moscow',
+          },
+        },
+      });
+
+      const branch = await tx.branch.create({
+        data: {
+          organizationId: organization.id,
+          name: 'Главный филиал',
+          timezone: 'Europe/Moscow',
+        },
+      });
+
+      const user = await tx.user.create({
+        data: {
+          email,
+          passwordHash,
+        },
+      });
+
+      const staff = await tx.staff.create({
+        data: {
+          userId: user.id,
+          organizationId: organization.id,
+          branchId: branch.id,
+          firstName: input.firstName.trim(),
+          lastName: input.lastName.trim(),
+          middleName: input.middleName?.trim() || null,
+          phone: input.phone?.trim() || null,
+        },
+      });
+
+      await tx.staffRole.create({
+        data: {
+          staffId: staff.id,
+          roleId: adminRole.id,
+          assignedBy: staff.id,
+        },
+      });
+
+      const paymentMethods = [
+        { code: 'cash', name: 'Наличные', type: PaymentMethodType.CASH },
+        { code: 'card', name: 'Банковская карта', type: PaymentMethodType.CARD },
+        { code: 'transfer', name: 'Безналичный перевод', type: PaymentMethodType.TRANSFER },
+        { code: 'certificate', name: 'Подарочный сертификат', type: PaymentMethodType.CERTIFICATE },
+      ];
+
+      for (const pm of paymentMethods) {
+        await tx.paymentMethod.create({
+          data: {
+            organizationId: organization.id,
+            code: pm.code,
+            name: pm.name,
+            type: pm.type,
+          },
+        });
+      }
+
+      return { user, staff, organization, branch };
+    });
+
+    await this.activity.log({
+      organizationId: result.organization.id,
+      userId: result.user.id,
+      eventType: ACTIVITY_EVENTS.AUTH_REGISTER,
+      entityType: 'Organization',
+      entityId: result.organization.id,
+      metadata: {
+        organizationName: result.organization.name,
+        staffId: result.staff.id,
+      },
+      ipAddress,
+    });
+
+    return this.issueTokens(
+      result.user.id,
+      result.staff,
+      [RoleCode.ADMIN],
+      userAgent,
+      ipAddress,
+    );
+  }
+
   async login(email: string, password: string, userAgent?: string, ipAddress?: string) {
+    const normalized = email.trim().toLowerCase();
     const user = await this.prisma.user.findUnique({
-      where: { email },
+      where: { email: normalized },
       include: {
         staff: {
           include: {
@@ -37,12 +168,12 @@ export class AuthService {
     });
 
     if (!user?.isActive || !user.staff?.isActive || user.staff.deletedAt) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException('Неверный email или пароль');
     }
 
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException('Неверный email или пароль');
     }
 
     const roles = user.staff.staffRoles.map((sr) => sr.role.code as RoleCode);
@@ -190,6 +321,10 @@ export class AuthService {
     ipAddress?: string,
   ) {
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    const staffProfile = await this.prisma.staff.findUniqueOrThrow({
+      where: { id: staff.id },
+    });
+
     const payload: JwtPayload = {
       sub: userId,
       staffId: staff.id,
@@ -222,12 +357,106 @@ export class AuthService {
       },
     });
 
+    const permissions = getPermissionsForRoles(roles);
+
     return {
       accessToken,
       refreshToken,
       expiresIn: accessTtl,
-      user: await this.me(userId),
+      user: {
+        id: user.id,
+        email: user.email,
+        isActive: user.isActive,
+      },
+      staff: {
+        id: staffProfile.id,
+        firstName: staffProfile.firstName,
+        lastName: staffProfile.lastName,
+        middleName: staffProfile.middleName ?? undefined,
+        avatarUrl: staffProfile.avatarUrl ?? undefined,
+        specialization: staffProfile.specialization ?? undefined,
+      },
+      permissions,
+      roles,
+      organizationId: staff.organizationId,
+      branchId: staff.branchId,
     };
+  }
+
+  private async ensureSystemRoles() {
+    const roleNames: Record<RoleCode, string> = {
+      [RoleCode.ADMIN]: 'Администратор',
+      [RoleCode.DOCTOR]: 'Врач-остеопат',
+      [RoleCode.MASSAGE_THERAPIST]: 'Массажист',
+      [RoleCode.MANAGER]: 'Менеджер',
+      [RoleCode.FINANCE]: 'Финансист',
+    };
+
+    const permissionMap = new Map<string, string>();
+    for (const code of Object.values(PERMISSIONS)) {
+      const [resource, action] = code.split(':');
+      const permission = await this.prisma.permission.upsert({
+        where: { code },
+        update: {},
+        create: {
+          code,
+          resource,
+          action,
+          description: `${resource} ${action}`,
+        },
+      });
+      permissionMap.set(code, permission.id);
+    }
+
+    for (const code of Object.values(RoleCode)) {
+      const role = await this.prisma.role.upsert({
+        where: { code },
+        update: {},
+        create: {
+          code,
+          name: roleNames[code],
+          isSystem: true,
+        },
+      });
+
+      for (const permCode of ROLE_PERMISSIONS[code]) {
+        const permissionId = permissionMap.get(permCode);
+        if (!permissionId) continue;
+        await this.prisma.rolePermission.upsert({
+          where: {
+            roleId_permissionId: { roleId: role.id, permissionId },
+          },
+          update: {},
+          create: { roleId: role.id, permissionId },
+        });
+      }
+    }
+  }
+
+  private slugify(value: string): string {
+    const base = value
+      .trim()
+      .toLowerCase()
+      .replace(/ё/g, 'e')
+      .replace(/[^a-z0-9а-я]+/gi, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 48);
+
+    const latin = base
+      .replace(/[а-я]/g, (ch) => {
+        const map: Record<string, string> = {
+          а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ж: 'zh', з: 'z',
+          и: 'i', й: 'y', к: 'k', л: 'l', м: 'm', н: 'n', о: 'o', п: 'p',
+          р: 'r', с: 's', т: 't', у: 'u', ф: 'f', х: 'h', ц: 'c', ч: 'ch',
+          ш: 'sh', щ: 'sch', ъ: '', ы: 'y', ь: '', э: 'e', ю: 'yu', я: 'ya',
+        };
+        return map[ch] ?? '';
+      })
+      .replace(/[^a-z0-9-]+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-+|-+$/g, '');
+
+    return latin || `org-${Date.now().toString(36)}`;
   }
 
   private hashToken(token: string) {
