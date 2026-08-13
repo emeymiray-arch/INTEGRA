@@ -1,10 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "installCommand": "cd ../.. && pnpm install",
-  "buildCommand": "bash ../../infrastructure/scripts/vercel-build-web.sh",
-  "outputDirectory": "dist",
-  "framework": null,
+  "buildCommand": "cd ../.. && pnpm --filter @integra/shared build && pnpm --filter @integra/api build",
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/(.*)", "destination": "/serverless" }
   ]
 }

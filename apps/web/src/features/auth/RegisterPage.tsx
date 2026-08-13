@@ -66,7 +66,9 @@ export function RegisterPage() {
 
   const errorMessage =
     registerMutation.error instanceof AxiosError
-      ? (registerMutation.error.response?.data as { message?: string | string[] })?.message
+      ? !registerMutation.error.response
+        ? 'Сервер API недоступен. Сейчас на Vercel задеплоен только фронт — нужен NestJS API и PostgreSQL.'
+        : (registerMutation.error.response?.data as { message?: string | string[] })?.message
       : null;
   const errorText = Array.isArray(errorMessage)
     ? errorMessage.join(', ')

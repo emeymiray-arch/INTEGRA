@@ -7,32 +7,27 @@ cd "$ROOT"
 
 echo "[integra] monorepo root: $ROOT"
 
-if ! command -v pnpm >/dev/null 2>&1; then
-  corepack enable >/dev/null 2>&1 || true
-fi
-
-pnpm exec turbo run build --filter=@integra/web
+pnpm exec turbo run build --filter=@integra/shared --filter=@integra/web
 
 WEB_DIST="$ROOT/apps/web/dist"
 if [ ! -f "$WEB_DIST/index.html" ]; then
   echo "[integra] ERROR: missing $WEB_DIST/index.html"
-  find "$ROOT/apps/web" -maxdepth 3 -type d -print || true
   exit 1
 fi
 
-# Publish to monorepo-root/dist (Root Directory = ".")
-rm -rf "$ROOT/dist"
+rm -rf "$ROOT/dist" "$ROOT/public"
+mkdir -p "$ROOT/public"
+cp -R "$WEB_DIST"/. "$ROOT/public/"
+
+# Also publish root/dist for Turbo default outputDirectory detection
 mkdir -p "$ROOT/dist"
 cp -R "$WEB_DIST"/. "$ROOT/dist/"
-echo "[integra] published $ROOT/dist"
 
-# If Vercel Root Directory is apps/web, ./dist already exists as Vite outDir.
-# If Root Directory is apps/api, also publish there so "dist" is found.
 if [ -d "$ROOT/apps/api" ]; then
-  rm -rf "$ROOT/apps/api/dist"
-  mkdir -p "$ROOT/apps/api/dist"
-  cp -R "$WEB_DIST"/. "$ROOT/apps/api/dist/"
-  echo "[integra] published $ROOT/apps/api/dist"
+  rm -rf "$ROOT/apps/api/dist-web"
+  mkdir -p "$ROOT/apps/api/dist-web"
+  cp -R "$WEB_DIST"/. "$ROOT/apps/api/dist-web/"
 fi
 
-echo "[integra] done"
+echo "[integra] web artifacts ready"
+ls -la "$ROOT/public" | head -15
