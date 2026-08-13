@@ -1,3 +1,4 @@
+.vercel
 node_modules
 dist
 public
@@ -13,5 +14,4 @@ coverage
 apps/*/dist
 packages/*/dist
 apps/api/public
-
 .pnpm-store
