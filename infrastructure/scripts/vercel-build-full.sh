@@ -30,6 +30,9 @@ if [ ! -f "$API_HANDLER" ]; then
 fi
 
 echo "[integra] bundling Nest serverless handler (fixes missing express on Vercel)"
+# Nest optionally requires websockets/microservices; mapped-types optionally requires
+# class-transformer/storage. Mark them external so esbuild does not fail the build.
+# Quote globs so shells do not expand them.
 npx --yes esbuild@0.25.0 "$API_HANDLER" \
   --bundle \
   --platform=node \
@@ -37,7 +40,12 @@ npx --yes esbuild@0.25.0 "$API_HANDLER" \
   --format=cjs \
   --outfile="$API_BUNDLE" \
   --external:@prisma/client \
-  --external:.prisma/client
+  --external:.prisma/client \
+  --external:@nestjs/microservices \
+  '--external:@nestjs/microservices/*' \
+  --external:@nestjs/websockets \
+  '--external:@nestjs/websockets/*' \
+  --external:class-transformer/storage
 
 if [ ! -f "$API_BUNDLE" ]; then
   echo "[integra] ERROR: missing $API_BUNDLE"
