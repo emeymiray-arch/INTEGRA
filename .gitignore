@@ -12,3 +12,4 @@ coverage
 *.tsbuildinfo
 apps/*/dist
 packages/*/dist
+apps/api/public

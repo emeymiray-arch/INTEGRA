@@ -28,17 +28,25 @@ if [ ! -f "$API_HANDLER" ]; then
   exit 1
 fi
 
+# Root deploy (Root Directory = ".")
 rm -rf "$ROOT/public"
 mkdir -p "$ROOT/public"
 cp -R "$WEB_DIST"/. "$ROOT/public/"
 
-# Ensure Vercel can resolve the serverless entry
 mkdir -p "$ROOT/api"
 cat > "$ROOT/api/index.js" <<'EOF'
 module.exports = require('../apps/api/dist/serverless.js');
 EOF
 
-echo "[integra] web → public/, api → api/index.js"
-ls -la "$ROOT/public" | head -10
-ls -la "$ROOT/api"
-ls -la "$ROOT/apps/api/dist/serverless.js"
+# apps/api deploy (Root Directory = "apps/api")
+rm -rf "$ROOT/apps/api/public"
+mkdir -p "$ROOT/apps/api/public"
+cp -R "$WEB_DIST"/. "$ROOT/apps/api/public/"
+
+mkdir -p "$ROOT/apps/api/api"
+cat > "$ROOT/apps/api/api/index.js" <<'EOF'
+module.exports = require('../dist/serverless.js');
+EOF
+
+echo "[integra] staged public/ + api/ for root and apps/api"
+ls -la "$ROOT/public/index.html" "$ROOT/api/index.js" "$ROOT/apps/api/public/index.html" "$ROOT/apps/api/api/index.js" "$API_HANDLER"

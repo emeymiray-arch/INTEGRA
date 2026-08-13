@@ -1,17 +1,18 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "installCommand": "cd ../.. && pnpm install",
-  "buildCommand": "bash ../../infrastructure/scripts/vercel-build-full.sh",
-  "outputDirectory": "../../public",
+  "buildCommand": "cd ../.. && bash infrastructure/scripts/vercel-build-full.sh",
+  "outputDirectory": "public",
   "framework": null,
   "functions": {
-    "../../api/index.js": {
+    "api/index.js": {
       "maxDuration": 30,
       "includeFiles": "dist/**"
     }
   },
   "rewrites": [
     { "source": "/api/v1/(.*)", "destination": "/api" },
+    { "source": "/api/(.*)", "destination": "/api" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }
