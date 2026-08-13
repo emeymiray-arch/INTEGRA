@@ -64,15 +64,52 @@ export function RegisterPage() {
     },
   });
 
-  const errorMessage =
-    registerMutation.error instanceof AxiosError
-      ? !registerMutation.error.response
-        ? 'Сервер API недоступен. Сейчас на Vercel задеплоен только фронт — нужен NestJS API и PostgreSQL.'
-        : (registerMutation.error.response?.data as { message?: string | string[] })?.message
-      : null;
-  const errorText = Array.isArray(errorMessage)
-    ? errorMessage.join(', ')
-    : errorMessage || 'Не удалось зарегистрироваться';
+  const errorText = (() => {
+    if (!(registerMutation.error instanceof AxiosError)) {
+      return 'Не удалось зарегистрироваться';
+    }
+
+    const err = registerMutation.error;
+    if (!err.response) {
+      return 'Сервер API недоступен. Проверьте деплой и DATABASE_URL в Vercel.';
+    }
+
+    const status = err.response.status;
+    const raw = err.response.data;
+    const asText = typeof raw === 'string' ? raw : '';
+
+    if (
+      status === 401 ||
+      status === 403 ||
+      asText.includes('vercel.com/sso') ||
+      asText.includes('Authentication Required')
+    ) {
+      return 'Сайт закрыт Vercel Authentication (SSO). Отключите Deployment Protection в настройках проекта Vercel.';
+    }
+
+    if (status === 503) {
+      const nested =
+        typeof raw === 'object' && raw && 'error' in raw
+          ? (raw as { error?: { message?: string } }).error?.message
+          : undefined;
+      return nested || 'API не готов: проверьте DATABASE_URL.';
+    }
+
+    const message =
+      typeof raw === 'object' && raw && 'message' in raw
+        ? (raw as { message?: string | string[] }).message
+        : typeof raw === 'object' && raw && 'error' in raw
+          ? (raw as { error?: { message?: string } | string }).error
+          : undefined;
+
+    if (typeof message === 'string') return message;
+    if (Array.isArray(message)) return message.join(', ');
+    if (message && typeof message === 'object' && 'message' in message) {
+      return String((message as { message?: string }).message);
+    }
+
+    return `Ошибка регистрации (${status})`;
+  })();
 
   return (
     <Card padding="lg" className="shadow-md">
