@@ -1,5 +1,6 @@
 node_modules
 dist
+public
 .turbo
 .env
 .env.local
@@ -8,5 +9,6 @@ dist
 uploads
 coverage
 .prisma
+*.tsbuildinfo
 apps/*/dist
 packages/*/dist
