@@ -176,3 +176,12 @@ cp "$OUT/functions/api.func/handler.js" "$ROOT/apps/api/api/handler.js"
 echo "[integra] Build Output API ready"
 du -sh "$OUT" "$OUT/functions/api.func" "$OUT/static"
 ls -la "$OUT/functions/api.func" | head -20
+
+# Vercel Root Directory is often "apps/api" — it only reads apps/api/.vercel/output.
+# Without this copy the deploy serves nothing → NOT_FOUND / "The page could not be found".
+API_OUT="$ROOT/apps/api/.vercel/output"
+rm -rf "$API_OUT"
+mkdir -p "$ROOT/apps/api/.vercel"
+cp -R "$OUT" "$API_OUT"
+echo "[integra] mirrored Build Output to $API_OUT"
+du -sh "$API_OUT"
