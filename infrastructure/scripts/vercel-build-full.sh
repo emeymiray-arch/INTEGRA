@@ -35,6 +35,7 @@ echo "[integra] bundling Nest serverless handler (fixes missing express on Verce
 # Quote globs so shells do not expand them.
 npx --yes esbuild@0.25.0 "$API_HANDLER" \
   --bundle \
+  --minify \
   --platform=node \
   --target=node20 \
   --format=cjs \
