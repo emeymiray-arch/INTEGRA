@@ -57,22 +57,8 @@ mkdir -p "$ROOT/apps/api/public"
 cp -R "$WEB_DIST"/. "$ROOT/apps/api/public/"
 
 mkdir -p "$ROOT/apps/api/api"
-cat > "$ROOT/apps/api/api/index.js" <<'EOF'
-'use strict';
-try {
-  require('reflect-metadata');
-  const mod = require('../dist/serverless.js');
-  module.exports = typeof mod === 'function' ? mod : mod.default;
-} catch (error) {
-  module.exports = async function failingHandler(_req, res) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error('[INTEGRA] Failed to load serverless handler:', message);
-    res.statusCode = 500;
-    res.setHeader('Content-Type', 'application/json');
-    res.end(JSON.stringify({ data: null, error: { code: 'HANDLER_LOAD_FAILED', message } }));
-  };
-}
-EOF
+# Keep the checked-in apps/api/api/index.js (do not overwrite diagnostic handler)
+cp -f "$ROOT/apps/api/api/index.js" "$ROOT/apps/api/api/index.js"
 
 echo "[integra] staged public/ + api/ for root and apps/api"
 ls -la "$ROOT/public/index.html" "$ROOT/api/index.js" "$ROOT/apps/api/public/index.html" "$ROOT/apps/api/api/index.js" "$API_HANDLER"
