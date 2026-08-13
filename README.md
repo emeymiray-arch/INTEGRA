@@ -61,40 +61,28 @@ integra/
 | `pnpm db:seed` | Начальные данные INTEGRA |
 | `pnpm db:studio` | Prisma Studio |
 
-## Деплой
+## Деплой на Vercel (web + API в одном проекте)
 
-### Почему «не удалось зарегистрироваться» на Vercel
+Root Directory: **`.`** (корень репозитория)
 
-Сейчас проект `integra-api` отдаёт **только фронт (SPA)**.  
-Запрос `POST /api/v1/auth/register` уходит в никуда → ошибка регистрации.
+### Обязательные Environment Variables
 
-Нужно **два сервиса**:
+| Variable | Значение |
+|----------|----------|
+| `DATABASE_URL` | PostgreSQL (Neon). Без неё API вернёт 503 |
+| `JWT_ACCESS_SECRET` | длинный секрет |
+| `JWT_REFRESH_SECRET` | длинный секрет |
+| `CORS_ORIGIN` | `*` или URL фронта |
 
-1. **Web** (Vercel) — UI  
-2. **API** (NestJS) + **PostgreSQL** (Neon / Supabase / Railway)
-
-### Локально (работает сразу)
+После добавления `DATABASE_URL` один раз примените схему:
 
 ```bash
-docker compose -f infrastructure/docker/docker-compose.yml up -d
-cp .env.example apps/api/.env
-pnpm db:push && pnpm db:seed
-pnpm dev
+cd apps/api && npx prisma db push && npx prisma db seed
 ```
 
-Откройте http://localhost:5173/register
+(или через Neon SQL / CI).
 
-### Production
-
-1. Создайте PostgreSQL (Neon) → `DATABASE_URL`
-2. Задеплойте API (`apps/api`) с env:
-   - `DATABASE_URL`
-   - `JWT_ACCESS_SECRET`
-   - `JWT_REFRESH_SECRET`
-   - `CORS_ORIGIN=https://ваш-фронт.vercel.app`
-3. Во фронт-проекте Vercel добавьте:
-   - `VITE_API_URL=https://ваш-api.vercel.app/api/v1`
-4. Redeploy фронта
+Фронт ходит на тот же домен: `/api/v1/...`
 
 ## Документация
 

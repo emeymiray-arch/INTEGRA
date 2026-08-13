@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ACTIVITY_EVENTS, RoleCode } from '@integra/shared';
-import * as bcrypt from 'bcrypt';
+import * as bcrypt from 'bcryptjs';
 import { Prisma } from '@prisma/client';
 import { ActivityService } from '../../common/services/activity.service';
 import { PrismaService } from '../../database/prisma.service';

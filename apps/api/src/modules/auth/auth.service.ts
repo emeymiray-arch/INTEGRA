@@ -12,7 +12,7 @@ import {
   ROLE_PERMISSIONS,
   RoleCode,
 } from '@integra/shared';
-import * as bcrypt from 'bcrypt';
+import * as bcrypt from 'bcryptjs';
 import { createHash, randomBytes } from 'crypto';
 import { PaymentMethodType } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';

@@ -1,8 +1,17 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "installCommand": "cd ../.. && pnpm install",
-  "buildCommand": "cd ../.. && pnpm --filter @integra/shared build && pnpm --filter @integra/api build",
+  "buildCommand": "bash ../../infrastructure/scripts/vercel-build-full.sh",
+  "outputDirectory": "../../public",
+  "framework": null,
+  "functions": {
+    "../../api/index.js": {
+      "maxDuration": 30,
+      "includeFiles": "dist/**"
+    }
+  },
   "rewrites": [
-    { "source": "/(.*)", "destination": "/serverless" }
+    { "source": "/api/v1/(.*)", "destination": "/api" },
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }
