@@ -19,6 +19,8 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     const pool = new Pool({
       connectionString,
       max: 1,
+      connectionTimeoutMillis: 4000,
+      idleTimeoutMillis: 10000,
       ssl: connectionString.includes('localhost') ? undefined : { rejectUnauthorized: false },
     });
     super({ adapter: new PrismaPg(pool) });
@@ -42,7 +44,12 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       console.warn('[Prisma] DATABASE_URL is not set — skipping $connect');
       return;
     }
-    await this.$connect();
+    if (process.env.VERCEL) return;
+    try {
+      await this.$connect();
+    } catch (error) {
+      console.warn('[Prisma] initial connect failed, will retry on first query', error);
+    }
   }
 
   async onModuleDestroy() {

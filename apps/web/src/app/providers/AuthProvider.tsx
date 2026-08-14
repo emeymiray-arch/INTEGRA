@@ -22,7 +22,7 @@ type MeResponse = {
 };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const { isAuthenticated, accessToken, setAuth, logout } = useAuthStore();
+  const { isAuthenticated, accessToken, user, setAuth, logout } = useAuthStore();
 
   useEffect(() => {
     const finish = () => useAuthStore.setState({ hasHydrated: true });
@@ -31,7 +31,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return persistApi.onFinishHydration(finish);
   }, []);
 
-  const { isLoading } = useQuery({
+  const { isLoading, isFetching } = useQuery({
     queryKey: ['auth', 'me'],
     queryFn: async () => {
       const res = await apiClient.get('/auth/me');
@@ -63,8 +63,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!accessToken) logout();
   }, [isAuthenticated, accessToken, logout]);
 
+  const blocking = isAuthenticated && !user && (isLoading || isFetching);
+
   return (
-    <AuthContext.Provider value={{ isLoading: isAuthenticated && isLoading, isAuthenticated }}>
+    <AuthContext.Provider value={{ isLoading: blocking, isAuthenticated }}>
       {children}
     </AuthContext.Provider>
   );

@@ -281,25 +281,35 @@ export class FinanceService {
       organizationId,
       ...(includeSettled ? {} : { settledAt: null }),
     };
-    const [items, countOpen, openSum] = await Promise.all([
-      this.prisma.debt.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        take: 200,
-      }),
-      this.prisma.debt.count({
-        where: { organizationId, settledAt: null },
-      }),
-      this.prisma.debt.aggregate({
-        where: { organizationId, settledAt: null },
-        _sum: { amount: true },
-      }),
-    ]);
-    return {
-      items: items.map((row) => ({ ...row, amount: Number(row.amount) })),
-      totalOpen: Number(openSum._sum.amount ?? 0),
-      countOpen,
-    };
+    try {
+      const [items, countOpen, openSum] = await Promise.all([
+        this.prisma.debt.findMany({
+          where,
+          orderBy: { createdAt: 'desc' },
+          take: 200,
+        }),
+        this.prisma.debt.count({
+          where: { organizationId, settledAt: null },
+        }),
+        this.prisma.debt.aggregate({
+          where: { organizationId, settledAt: null },
+          _sum: { amount: true },
+        }),
+      ]);
+      return {
+        items: items.map((row) => ({ ...row, amount: Number(row.amount) })),
+        totalOpen: Number(openSum._sum.amount ?? 0),
+        countOpen,
+      };
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        (error.code === 'P2021' || error.code === 'P2022')
+      ) {
+        return { items: [], totalOpen: 0, countOpen: 0 };
+      }
+      throw error;
+    }
   }
 
   createDebt(

@@ -59,6 +59,7 @@ export function FinancePage() {
       });
       return data as { items?: Invoice[]; total?: number; page?: number; limit?: number };
     },
+    retry: false,
   });
 
   const {
@@ -73,6 +74,7 @@ export function FinancePage() {
       });
       return data as { items?: Debt[]; totalOpen?: number; countOpen?: number };
     },
+    retry: false,
   });
 
   const settle = useMutation({
