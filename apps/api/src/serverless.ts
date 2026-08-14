@@ -71,7 +71,10 @@ export default async function handler(req: Request, res: Response): Promise<void
     const server = await bootstrap();
     await new Promise<void>((resolve, reject) => {
       try {
-        server.handle(req, res, (err?: unknown) => {
+        // Express Application.handle exists at runtime; typings omit the overload we need.
+        (server as unknown as {
+          handle: (req: Request, res: Response, cb?: (err?: unknown) => void) => void;
+        }).handle(req, res, (err?: unknown) => {
           if (err) reject(err);
           else resolve();
         });
