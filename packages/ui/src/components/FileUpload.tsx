@@ -94,7 +94,10 @@ export function FileUpload({
             accept={accept}
             multiple={multiple}
             disabled={disabled}
-            onChange={(e) => handleFiles(e.target.files)}
+            onChange={(e) => {
+              handleFiles(e.target.files);
+              e.target.value = '';
+            }}
           />
           <FileUp className="h-4 w-4" />
           Выбрать файл

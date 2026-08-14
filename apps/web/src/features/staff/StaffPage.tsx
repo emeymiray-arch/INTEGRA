@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, UserCog } from 'lucide-react';
+import { asList } from '@integra/shared';
 import {
   Avatar,
   Badge,
@@ -12,6 +13,8 @@ import {
 import { apiClient, type StaffMember } from '@/shared/api/client';
 import { fullName } from '@/shared/lib/format';
 import { CreateStaffDialog } from './CreateStaffDialog';
+import { PERMISSIONS, useCan } from '@/shared/lib/permissions';
+import { apiErrorMessage } from '@/shared/api/errorMessage';
 
 const roleLabels: Record<string, string> = {
   ADMIN: 'Администратор',
@@ -22,19 +25,28 @@ const roleLabels: Record<string, string> = {
 };
 
 export function StaffPage() {
+  const queryClient = useQueryClient();
+  const canWriteStaff = useCan(PERMISSIONS.STAFF_WRITE);
   const [createOpen, setCreateOpen] = useState(false);
-  const { data: staff = [], isLoading } = useQuery({
+  const { data: staff = [], isLoading, isError } = useQuery({
     queryKey: ['staff'],
     queryFn: async () => {
       const { data } = await apiClient.get('/staff');
-      const list = (data?.data ?? data ?? []) as Array<
+      const list = asList<
         StaffMember & { staffRoles?: Array<{ role: { code: string; name: string } }> }
-      >;
+      >(data);
       return list.map((member) => ({
         ...member,
         roles: member.roles ?? member.staffRoles?.map((item) => item.role),
       }));
     },
+  });
+
+  const remove = useMutation({
+    mutationFn: async (id: string) => {
+      await apiClient.delete(`/staff/${id}`);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['staff'] }),
   });
 
   return (
@@ -43,12 +55,23 @@ export function StaffPage() {
         title="Сотрудники"
         description="Управление персоналом и ролями"
         actions={
+          canWriteStaff ? (
           <Button onClick={() => setCreateOpen(true)}>
             <Plus className="h-4 w-4" />
             Добавить сотрудника
           </Button>
+          ) : undefined
         }
       />
+
+      {isError && (
+        <p className="mb-4 text-sm text-integra-error">Не удалось загрузить сотрудников</p>
+      )}
+      {remove.isError && (
+        <p className="mb-4 text-sm text-integra-error">
+          {apiErrorMessage(remove.error, 'Не удалось удалить сотрудника')}
+        </p>
+      )}
 
       {isLoading ? (
         <div className="flex justify-center py-24">
@@ -59,7 +82,11 @@ export function StaffPage() {
           icon={<UserCog className="h-7 w-7" />}
           title="Сотрудники не найдены"
           description="Добавьте первого сотрудника"
-          action={{ label: 'Добавить', onClick: () => setCreateOpen(true) }}
+          action={
+            canWriteStaff
+              ? { label: 'Добавить', onClick: () => setCreateOpen(true) }
+              : undefined
+          }
         />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -87,9 +114,22 @@ export function StaffPage() {
                     ))}
                   </div>
                 </div>
+                <div className="flex flex-col items-end gap-2">
                 <Badge variant={member.isActive ? 'success' : 'muted'}>
                   {member.isActive ? 'Активен' : 'Неактивен'}
                 </Badge>
+                {canWriteStaff && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    if (window.confirm('Деактивировать сотрудника?')) remove.mutate(member.id);
+                  }}
+                >
+                  Удалить
+                </Button>
+                )}
+                </div>
               </div>
             </Card>
           ))}

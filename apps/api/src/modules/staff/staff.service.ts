@@ -40,6 +40,7 @@ export class StaffService {
         },
       },
       orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+      take: 100,
     });
   }
 
@@ -72,9 +73,9 @@ export class StaffService {
       phone?: string;
       roleCodes: RoleCode[];
     },
-    createdBy: string,
+    createdBy: { userId: string; staffId: string },
   ) {
-    const existing = await this.prisma.user.findUnique({ where: { email: data.email } });
+    const existing = await this.prisma.user.findUnique({ where: { email: data.email.trim().toLowerCase() } });
     if (existing) throw new ConflictException('Email already in use');
 
     const passwordHash = await bcrypt.hash(data.password, 10);
@@ -84,7 +85,7 @@ export class StaffService {
 
     const staff = await this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
-        data: { email: data.email, passwordHash },
+        data: { email: data.email.trim().toLowerCase(), passwordHash },
       });
 
       const created = await tx.staff.create({
@@ -105,7 +106,7 @@ export class StaffService {
           data: {
             staffId: created.id,
             roleId: role.id,
-            assignedBy: createdBy,
+            assignedBy: createdBy.staffId,
           },
         });
       }
@@ -115,7 +116,7 @@ export class StaffService {
 
     await this.activity.log({
       organizationId,
-      userId: createdBy,
+      userId: createdBy.userId,
       eventType: ACTIVITY_EVENTS.STAFF_CREATED,
       entityType: 'Staff',
       entityId: staff.id,
@@ -153,9 +154,16 @@ export class StaffService {
     if (!role) throw new NotFoundException('Role not found');
 
     const existing = await this.prisma.staffRole.findFirst({
-      where: { staffId, roleId: role.id, revokedAt: null },
+      where: { staffId, roleId: role.id },
     });
-    if (existing) return existing;
+    if (existing && !existing.revokedAt) return existing;
+    if (existing) {
+      return this.prisma.staffRole.update({
+        where: { id: existing.id },
+        data: { revokedAt: null, assignedBy },
+        include: { role: true },
+      });
+    }
 
     return this.prisma.staffRole.create({
       data: { staffId, roleId: role.id, assignedBy },

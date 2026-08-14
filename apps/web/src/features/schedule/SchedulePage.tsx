@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { AppointmentStatus } from '@integra/shared';
+import { AppointmentStatus, asList } from '@integra/shared';
 import { Button, Card, PageHeader } from '@integra/ui';
 import { apiClient, type Appointment } from '@/shared/api/client';
 import {
@@ -11,17 +11,25 @@ import {
   fullName,
 } from '@/shared/lib/format';
 
-const HOURS = Array.from({ length: 12 }, (_, i) => i + 8);
+const HOURS = Array.from({ length: 13 }, (_, i) => i + 8);
 const DAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 
+function startOfDay(value: Date) {
+  const date = new Date(value);
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
 function getWeekDates(base: Date) {
-  const start = new Date(base);
+  const start = startOfDay(base);
   const day = start.getDay();
   const diff = day === 0 ? -6 : 1 - day;
   start.setDate(start.getDate() + diff);
+  start.setHours(0, 0, 0, 0);
   return Array.from({ length: 7 }, (_, i) => {
     const d = new Date(start);
     d.setDate(start.getDate() + i);
+    d.setHours(0, 0, 0, 0);
     return d;
   });
 }
@@ -39,16 +47,22 @@ export function SchedulePage() {
 
   const weekDates = useMemo(() => getWeekDates(weekStart), [weekStart]);
 
-  const { data: appointments = [], isLoading } = useQuery({
-    queryKey: ['schedule', weekDates[0].toISOString()],
+  const { data: appointments = [], isLoading, isError } = useQuery({
+    queryKey: ['schedule', weekDates[0].toDateString()],
     queryFn: async () => {
-      const { data } = await apiClient.get('/schedule', {
+      const from = new Date(weekDates[0]);
+      from.setHours(0, 0, 0, 0);
+      const to = new Date(weekDates[6]);
+      to.setHours(23, 59, 59, 999);
+      const { data } = await apiClient.get('/appointments', {
         params: {
-          from: weekDates[0].toISOString(),
-          to: weekDates[6].toISOString(),
+          from: from.toISOString(),
+          to: to.toISOString(),
+          limit: 200,
+          page: 1,
         },
       });
-      return (data?.appointments ?? data ?? []) as Appointment[];
+      return asList<Appointment>(data);
     },
   });
 
@@ -94,6 +108,10 @@ export function SchedulePage() {
           </div>
         ))}
       </div>
+
+      {isError && (
+        <p className="mb-4 text-sm text-integra-error">Не удалось загрузить расписание</p>
+      )}
 
       <Card padding="none" className="overflow-hidden">
         <div className="overflow-x-auto">

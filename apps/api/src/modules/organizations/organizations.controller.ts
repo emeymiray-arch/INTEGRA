@@ -53,7 +53,7 @@ export class OrganizationsController {
   }
 
   @Patch('current')
-  @RequirePermissions(PERMISSIONS.ORGANIZATION_WRITE)
+  @RequirePermissions(PERMISSIONS.ORGANIZATION_WRITE, PERMISSIONS.SETTINGS_WRITE)
   update(@CurrentUser() user: AuthUser, @Body() dto: UpdateOrganizationDto) {
     return this.organizationsService.update(user.organizationId, dto as never);
   }

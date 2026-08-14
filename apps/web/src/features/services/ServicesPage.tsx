@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
-import { formatMoney } from '@integra/shared';
+import { asList, formatMoney } from '@integra/shared';
 import {
   Badge,
   Button,
@@ -11,15 +11,26 @@ import {
 } from '@integra/ui';
 import { apiClient, type Service } from '@/shared/api/client';
 import { CreateServiceDialog } from './CreateServiceDialog';
+import { PERMISSIONS, useCan } from '@/shared/lib/permissions';
+import { apiErrorMessage } from '@/shared/api/errorMessage';
 
 export function ServicesPage() {
+  const queryClient = useQueryClient();
+  const canWriteServices = useCan(PERMISSIONS.SERVICES_WRITE);
   const [createOpen, setCreateOpen] = useState(false);
-  const { data: services = [], isLoading } = useQuery({
+  const { data: services = [], isLoading, isError } = useQuery({
     queryKey: ['services'],
     queryFn: async () => {
       const { data } = await apiClient.get('/services');
-      return (data?.data ?? data ?? []) as Service[];
+      return asList<Service>(data);
     },
+  });
+
+  const remove = useMutation({
+    mutationFn: async (id: string) => {
+      await apiClient.delete(`/services/${id}`);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['services'] }),
   });
 
   return (
@@ -28,12 +39,23 @@ export function ServicesPage() {
         title="Услуги"
         description="Справочник услуг медицинского центра"
         actions={
+          canWriteServices ? (
           <Button onClick={() => setCreateOpen(true)}>
             <Plus className="h-4 w-4" />
             Добавить услугу
           </Button>
+          ) : undefined
         }
       />
+
+      {isError && (
+        <p className="mb-4 text-sm text-integra-error">Не удалось загрузить услуги</p>
+      )}
+      {remove.isError && (
+        <p className="mb-4 text-sm text-integra-error">
+          {apiErrorMessage(remove.error, 'Не удалось удалить услугу')}
+        </p>
+      )}
 
       {isLoading ? (
         <div className="flex justify-center py-24">
@@ -43,7 +65,11 @@ export function ServicesPage() {
         <EmptyState
           title="Услуги не найдены"
           description="Добавьте первую услугу в справочник"
-          action={{ label: 'Добавить услугу', onClick: () => setCreateOpen(true) }}
+          action={
+            canWriteServices
+              ? { label: 'Добавить услугу', onClick: () => setCreateOpen(true) }
+              : undefined
+          }
         />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -70,9 +96,21 @@ export function ServicesPage() {
                   {service.durationMinutes} мин
                 </span>
                 <span className="text-lg font-bold text-primary">
-                  {formatMoney(service.price)}
+                  {formatMoney(Number(service.price))}
                 </span>
               </div>
+              {canWriteServices && (
+              <Button
+                className="mt-3"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  if (window.confirm('Скрыть услугу из справочника?')) remove.mutate(service.id);
+                }}
+              >
+                Удалить
+              </Button>
+              )}
             </Card>
           ))}
         </div>

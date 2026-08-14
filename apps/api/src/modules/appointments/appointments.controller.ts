@@ -11,7 +11,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AppointmentStatus, DiscountType } from '@prisma/client';
-import { PERMISSIONS } from '@integra/shared';
+import { clampLimit, clampPage, PERMISSIONS } from '@integra/shared';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -35,6 +35,8 @@ export class AppointmentsController {
     @Query('branchId') branchId?: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
   ) {
     return this.appointmentsService.findAll(user.organizationId, {
       patientId,
@@ -42,6 +44,8 @@ export class AppointmentsController {
       branchId,
       from,
       to,
+      page: clampPage(page),
+      limit: clampLimit(limit, 20, 50),
     });
   }
 

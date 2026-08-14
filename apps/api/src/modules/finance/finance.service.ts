@@ -15,19 +15,29 @@ export class FinanceService {
     private readonly activity: ActivityService,
   ) {}
 
-  findInvoices(organizationId: string, patientId?: string) {
-    return this.prisma.invoice.findMany({
-      where: {
-        organizationId,
-        ...(patientId ? { patientId } : {}),
-      },
-      include: {
-        patient: { select: { id: true, firstName: true, lastName: true } },
-        items: true,
-        payments: { include: { paymentMethod: true, refunds: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+  async findInvoices(
+    organizationId: string,
+    patientId?: string,
+    page = 1,
+    limit = 20,
+  ) {
+    const where = {
+      organizationId,
+      ...(patientId ? { patientId } : {}),
+    };
+    const [items, total] = await Promise.all([
+      this.prisma.invoice.findMany({
+        where,
+        include: {
+          patient: { select: { id: true, firstName: true, lastName: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.invoice.count({ where }),
+    ]);
+    return { items, total, page, limit };
   }
 
   async findInvoice(organizationId: string, id: string) {

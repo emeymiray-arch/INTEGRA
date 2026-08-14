@@ -30,6 +30,15 @@ class RefreshDto {
   refreshToken!: string;
 }
 
+class ChangePasswordDto {
+  @IsString()
+  currentPassword!: string;
+
+  @IsString()
+  @MinLength(6)
+  newPassword!: string;
+}
+
 class LogoutDto {
   @IsOptional()
   @IsString()
@@ -77,6 +86,17 @@ export class AuthController {
   @ApiBearerAuth()
   logout(@CurrentUser() user: AuthUser, @Body() dto: LogoutDto, @Req() req: Request) {
     return this.authService.logout(user.userId, dto.refreshToken, req.ip);
+  }
+
+  @Post('change-password')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  changePassword(@CurrentUser() user: AuthUser, @Body() dto: ChangePasswordDto) {
+    return this.authService.changePassword(
+      user.userId,
+      dto.currentPassword,
+      dto.newPassword,
+    );
   }
 
   @Get('me')

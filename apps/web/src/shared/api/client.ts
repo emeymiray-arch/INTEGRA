@@ -10,10 +10,16 @@ export const apiClient = axios.create({
 });
 
 let isRefreshing = false;
-let refreshQueue: Array<(token: string) => void> = [];
+let refreshQueue: Array<{
+  resolve: (token: string) => void;
+  reject: (error: unknown) => void;
+}> = [];
 
-function processQueue(token: string) {
-  refreshQueue.forEach((cb) => cb(token));
+function flushQueue(error: unknown, token?: string) {
+  refreshQueue.forEach(({ resolve, reject }) => {
+    if (error || !token) reject(error);
+    else resolve(token);
+  });
   refreshQueue = [];
 }
 
@@ -23,7 +29,7 @@ apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
     config.headers.Authorization = `Bearer ${token}`;
   }
   if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
-    config.headers.set('Content-Type', false);
+    config.headers.delete('Content-Type');
   }
   return config;
 });
@@ -53,10 +59,13 @@ apiClient.interceptors.response.use(
     }
 
     if (isRefreshing) {
-      return new Promise((resolve) => {
-        refreshQueue.push((token: string) => {
-          original.headers.Authorization = `Bearer ${token}`;
-          resolve(apiClient(original));
+      return new Promise((resolve, reject) => {
+        refreshQueue.push({
+          resolve: (token: string) => {
+            original.headers.Authorization = `Bearer ${token}`;
+            resolve(apiClient(original));
+          },
+          reject,
         });
       });
     }
@@ -75,27 +84,32 @@ apiClient.interceptors.response.use(
       const newAccess = payload.accessToken;
       const newRefresh = payload.refreshToken;
       setTokens(newAccess, newRefresh);
-      processQueue(newAccess);
+      flushQueue(null, newAccess);
       original.headers.Authorization = `Bearer ${newAccess}`;
       return apiClient(original);
-    } catch {
+    } catch (refreshError) {
+      flushQueue(refreshError);
       logout();
-      return Promise.reject(error);
+      return Promise.reject(refreshError);
     } finally {
       isRefreshing = false;
     }
   },
 );
 
-export interface PaginatedResponse<T> {
-  data: T[];
-  meta: { page: number; limit: number; total: number; totalPages: number };
+export interface Paginated<T> {
+  items: T[];
+  total: number;
+  page: number;
+  limit: number;
 }
 
 export interface DashboardStats {
   todayAppointments: number;
   todayRevenue: number;
   patientsCount: number;
+  monthRevenue?: number;
+  pendingInvoices?: number;
   popularServices: Array<{ id: string; name: string; count: number }>;
 }
 
@@ -106,7 +120,7 @@ export interface ActivityItem {
   entityId?: string;
   metadata?: Record<string, unknown>;
   createdAt: string;
-  user?: { firstName: string; lastName: string };
+  user?: { email?: string; firstName?: string; lastName?: string };
 }
 
 export interface Patient {
@@ -115,14 +129,9 @@ export interface Patient {
   lastName: string;
   middleName?: string;
   phone: string;
-  email?: string;
   birthDate?: string;
   gender?: string;
   status: string;
-  source?: string;
-  allergies?: string;
-  contraindications?: string;
-  chronicDiseases?: string;
   notes?: string;
   createdAt: string;
 }

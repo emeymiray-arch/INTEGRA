@@ -75,7 +75,7 @@ export function Modal({
               <p className="mt-1 text-sm text-integra-gray-600">{description}</p>
             )}
           </div>
-          <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close">
+          <Button variant="ghost" size="sm" type="button" onClick={onClose} aria-label="Close">
             <X className="h-4 w-4" />
           </Button>
         </div>

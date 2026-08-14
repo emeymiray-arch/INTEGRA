@@ -8,12 +8,15 @@ export class ScheduleService {
 
   async getAppointments(
     organizationId: string,
-    view: 'day' | 'week' | 'month',
-    date: string,
+    view: 'day' | 'week' | 'month' = 'week',
+    date: string | undefined,
     filters?: { staffId?: string; branchId?: string },
   ) {
-    const start = new Date(date);
-    const end = new Date(date);
+    const start = date ? new Date(date) : new Date();
+    if (Number.isNaN(start.getTime())) {
+      start.setTime(Date.now());
+    }
+    const end = new Date(start);
 
     if (view === 'day') {
       end.setDate(end.getDate() + 1);

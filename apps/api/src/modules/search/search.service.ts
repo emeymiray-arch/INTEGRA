@@ -6,25 +6,26 @@ export class SearchService {
   constructor(private readonly prisma: PrismaService) {}
 
   async globalSearch(organizationId: string, query: string, limit = 10) {
+    const q = query?.trim() ?? '';
+    if (q.length < 2) return { results: [] };
+    const take = Math.min(Math.max(limit, 1), 10);
     const [patients, staff, services] = await Promise.all([
       this.prisma.patient.findMany({
         where: {
           organizationId,
           deletedAt: null,
           OR: [
-            { firstName: { contains: query, mode: 'insensitive' } },
-            { lastName: { contains: query, mode: 'insensitive' } },
-            { phone: { contains: query } },
-            { email: { contains: query, mode: 'insensitive' } },
+            { firstName: { contains: q, mode: 'insensitive' } },
+            { lastName: { contains: q, mode: 'insensitive' } },
+            { phone: { contains: q } },
           ],
         },
-        take: limit,
+        take,
         select: {
           id: true,
           firstName: true,
           lastName: true,
           phone: true,
-          email: true,
         },
       }),
       this.prisma.staff.findMany({
@@ -32,12 +33,12 @@ export class SearchService {
           organizationId,
           deletedAt: null,
           OR: [
-            { firstName: { contains: query, mode: 'insensitive' } },
-            { lastName: { contains: query, mode: 'insensitive' } },
-            { specialization: { contains: query, mode: 'insensitive' } },
+            { firstName: { contains: q, mode: 'insensitive' } },
+            { lastName: { contains: q, mode: 'insensitive' } },
+            { specialization: { contains: q, mode: 'insensitive' } },
           ],
         },
-        take: limit,
+        take,
         select: {
           id: true,
           firstName: true,
@@ -50,11 +51,11 @@ export class SearchService {
           organizationId,
           isActive: true,
           OR: [
-            { name: { contains: query, mode: 'insensitive' } },
-            { description: { contains: query, mode: 'insensitive' } },
+            { name: { contains: q, mode: 'insensitive' } },
+            { description: { contains: q, mode: 'insensitive' } },
           ],
         },
-        take: limit,
+        take,
         select: {
           id: true,
           name: true,
@@ -64,6 +65,27 @@ export class SearchService {
       }),
     ]);
 
-    return { patients, staff, services };
+    return {
+      results: [
+        ...patients.map((patient) => ({
+          id: patient.id,
+          type: 'patient' as const,
+          title: `${patient.lastName} ${patient.firstName}`.trim(),
+          subtitle: patient.phone ?? undefined,
+        })),
+        ...staff.map((member) => ({
+          id: member.id,
+          type: 'staff' as const,
+          title: `${member.lastName} ${member.firstName}`.trim(),
+          subtitle: member.specialization ?? undefined,
+        })),
+        ...services.map((service) => ({
+          id: service.id,
+          type: 'service' as const,
+          title: service.name,
+          subtitle: `${service.durationMinutes} мин`,
+        })),
+      ],
+    };
   }
 }

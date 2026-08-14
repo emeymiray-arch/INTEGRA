@@ -17,32 +17,53 @@ export class AppointmentsService {
 
   async findAll(
     organizationId: string,
-    filters?: { patientId?: string; staffId?: string; branchId?: string; from?: string; to?: string },
+    filters?: {
+      patientId?: string;
+      staffId?: string;
+      branchId?: string;
+      from?: string;
+      to?: string;
+      page?: number;
+      limit?: number;
+    },
   ) {
-    return this.prisma.appointment.findMany({
-      where: {
-        organizationId,
-        deletedAt: null,
-        ...(filters?.patientId ? { patientId: filters.patientId } : {}),
-        ...(filters?.staffId ? { staffId: filters.staffId } : {}),
-        ...(filters?.branchId ? { branchId: filters.branchId } : {}),
-        ...(filters?.from || filters?.to
-          ? {
-              startsAt: {
-                ...(filters.from ? { gte: new Date(filters.from) } : {}),
-                ...(filters.to ? { lte: new Date(filters.to) } : {}),
-              },
-            }
-          : {}),
-      },
-      include: {
-        patient: { select: { id: true, firstName: true, lastName: true, phone: true } },
-        staff: { select: { id: true, firstName: true, lastName: true } },
-        service: true,
-        branch: { select: { id: true, name: true } },
-      },
-      orderBy: { startsAt: 'asc' },
-    });
+    const page = filters?.page ?? 1;
+    const limit = filters?.limit ?? 20;
+    const hasRange = Boolean(filters?.from || filters?.to);
+
+    const where = {
+      organizationId,
+      deletedAt: null,
+      ...(filters?.patientId ? { patientId: filters.patientId } : {}),
+      ...(filters?.staffId ? { staffId: filters.staffId } : {}),
+      ...(filters?.branchId ? { branchId: filters.branchId } : {}),
+      ...(hasRange
+        ? {
+            startsAt: {
+              ...(filters?.from ? { gte: new Date(filters.from) } : {}),
+              ...(filters?.to ? { lte: new Date(filters.to) } : {}),
+            },
+          }
+        : {}),
+    };
+
+    const [items, total] = await Promise.all([
+      this.prisma.appointment.findMany({
+        where,
+        include: {
+          patient: { select: { id: true, firstName: true, lastName: true, phone: true } },
+          staff: { select: { id: true, firstName: true, lastName: true } },
+          service: { select: { id: true, name: true } },
+          branch: { select: { id: true, name: true } },
+        },
+        orderBy: { startsAt: hasRange ? 'asc' : 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.appointment.count({ where }),
+    ]);
+
+    return { items, total, page, limit };
   }
 
   async findOne(organizationId: string, id: string) {
@@ -75,12 +96,45 @@ export class AppointmentsService {
     },
   ) {
     const service = await this.prisma.service.findFirst({
-      where: { id: data.serviceId, organizationId },
+      where: { id: data.serviceId, organizationId, isActive: true },
     });
     if (!service) throw new NotFoundException('Service not found');
 
+    const [patient, staff, branch] = await Promise.all([
+      this.prisma.patient.findFirst({
+        where: { id: data.patientId, organizationId, deletedAt: null },
+        select: { id: true },
+      }),
+      this.prisma.staff.findFirst({
+        where: { id: data.staffId, organizationId, deletedAt: null, isActive: true },
+        select: { id: true },
+      }),
+      this.prisma.branch.findFirst({
+        where: { id: data.branchId, organizationId, isActive: true },
+        select: { id: true },
+      }),
+    ]);
+    if (!patient) throw new NotFoundException('Patient not found');
+    if (!staff) throw new NotFoundException('Staff not found');
+    if (!branch) throw new NotFoundException('Branch not found');
+
     const startsAt = new Date(data.startsAt);
     const endsAt = new Date(startsAt.getTime() + service.durationMinutes * 60 * 1000);
+
+    const overlap = await this.prisma.appointment.findFirst({
+      where: {
+        organizationId,
+        staffId: data.staffId,
+        deletedAt: null,
+        status: { notIn: [AppointmentStatus.CANCELLED, AppointmentStatus.RESCHEDULED] },
+        startsAt: { lt: endsAt },
+        endsAt: { gt: startsAt },
+      },
+      select: { id: true },
+    });
+    if (overlap) {
+      throw new BadRequestException('Это время уже занято у специалиста');
+    }
     const basePrice = Number(service.price);
     const discountType = (data.discountType ?? DiscountType.NONE) as SharedDiscountType;
     const discountValue = data.discountValue ?? 0;
@@ -218,6 +272,22 @@ export class AppointmentsService {
     const newEndsAt = new Date(
       newStartsAt.getTime() + existing.durationMinutes * 60 * 1000,
     );
+
+    const overlap = await this.prisma.appointment.findFirst({
+      where: {
+        organizationId,
+        staffId: existing.staffId,
+        deletedAt: null,
+        status: { notIn: [AppointmentStatus.CANCELLED, AppointmentStatus.RESCHEDULED] },
+        id: { not: id },
+        startsAt: { lt: newEndsAt },
+        endsAt: { gt: newStartsAt },
+      },
+      select: { id: true },
+    });
+    if (overlap) {
+      throw new BadRequestException('Это время уже занято у специалиста');
+    }
 
     const newAppointment = await this.prisma.$transaction(async (tx) => {
       await tx.appointment.update({

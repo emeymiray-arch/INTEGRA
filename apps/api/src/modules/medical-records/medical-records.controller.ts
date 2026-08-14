@@ -9,7 +9,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { IsBoolean, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsEnum, IsOptional, IsString } from 'class-validator';
 import { TreatmentPlanStatus, VisitStatus } from '@prisma/client';
 import { PERMISSIONS } from '@integra/shared';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -43,6 +43,28 @@ class AddRecommendationDto {
   @IsOptional()
   @IsString()
   followUpDate?: string;
+}
+
+class UpdateVisitDto {
+  @IsOptional()
+  @IsString()
+  chiefComplaint?: string;
+
+  @IsOptional()
+  @IsString()
+  anamnesis?: string;
+
+  @IsOptional()
+  @IsString()
+  clinicalNotes?: string;
+
+  @IsOptional()
+  @IsString()
+  prescriptions?: string;
+
+  @IsOptional()
+  @IsEnum(VisitStatus)
+  status?: VisitStatus;
 }
 
 @ApiTags('medical-records')
@@ -92,6 +114,24 @@ export class MedicalRecordsController {
     );
   }
 
+  @Delete('diagnoses/:diagnosisId')
+  @RequirePermissions(PERMISSIONS.MEDICAL_WRITE)
+  removeDiagnosis(@CurrentUser() user: AuthUser, @Param('diagnosisId') diagnosisId: string) {
+    return this.medicalRecordsService.removeDiagnosis(user.organizationId, diagnosisId);
+  }
+
+  @Delete('recommendations/:recommendationId')
+  @RequirePermissions(PERMISSIONS.MEDICAL_WRITE)
+  removeRecommendation(
+    @CurrentUser() user: AuthUser,
+    @Param('recommendationId') recommendationId: string,
+  ) {
+    return this.medicalRecordsService.removeRecommendation(
+      user.organizationId,
+      recommendationId,
+    );
+  }
+
   @Post(':recordId/visits')
   @RequirePermissions(PERMISSIONS.MEDICAL_WRITE)
   createVisit(
@@ -123,7 +163,7 @@ export class MedicalRecordsController {
   updateVisit(
     @CurrentUser() user: AuthUser,
     @Param('visitId') visitId: string,
-    @Body() dto: Record<string, unknown>,
+    @Body() dto: UpdateVisitDto,
   ) {
     return this.medicalRecordsService.updateVisit(user.organizationId, visitId, dto);
   }

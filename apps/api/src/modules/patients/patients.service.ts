@@ -152,17 +152,42 @@ export class PatientsService {
     organizationId: string,
     id: string,
     userId: string,
-    data: Record<string, unknown>,
+    data: {
+      firstName?: string;
+      lastName?: string;
+      middleName?: string;
+      birthDate?: string;
+      gender?: Gender;
+      phone?: string;
+      notes?: string;
+      allergies?: string;
+      contraindications?: string;
+      chronicDiseases?: string;
+      status?: PatientStatus;
+    },
     ipAddress?: string,
   ) {
     const existing = await this.findOne(organizationId, id);
 
-    const updateData: Record<string, unknown> = { ...data };
-    if (typeof data.birthDate === 'string') {
-      updateData.birthDate = new Date(data.birthDate);
+    const updateData: Record<string, unknown> = {};
+    const allowed = [
+      'firstName',
+      'lastName',
+      'middleName',
+      'birthDate',
+      'gender',
+      'phone',
+      'notes',
+      'allergies',
+      'contraindications',
+      'chronicDiseases',
+      'status',
+    ] as const;
+    for (const key of allowed) {
+      if (data[key] !== undefined) updateData[key] = data[key];
     }
-    if (data.email === '') {
-      updateData.email = null;
+    if (typeof updateData.birthDate === 'string') {
+      updateData.birthDate = new Date(updateData.birthDate);
     }
 
     const updated = await this.prisma.patient.update({

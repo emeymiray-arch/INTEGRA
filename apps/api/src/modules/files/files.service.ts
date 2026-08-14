@@ -21,27 +21,24 @@ export class FilesService {
         deletedAt: null,
       },
       orderBy: { createdAt: 'desc' },
+      take: 12,
     });
 
     return Promise.all(
       files.map(async (file) => {
-        let previewUrl =
-          file.checksum?.startsWith('data:') ? file.checksum : undefined;
-        if (!previewUrl) {
-          previewUrl = await this.storage.getUrl(
-            file.storageKey,
-            file.externalId ?? undefined,
-          );
-          if (file.mimeType.startsWith('image/')) {
-            const buffer = await this.storage.readLocal(file.storageKey);
-            if (buffer) {
-              previewUrl = `data:${file.mimeType};base64,${buffer.toString('base64')}`;
-            }
+        let previewUrl = file.checksum?.startsWith('data:') ? file.checksum : undefined;
+        if (!previewUrl && file.mimeType.startsWith('image/')) {
+          const buffer = await this.storage.readLocal(file.storageKey);
+          if (buffer) {
+            previewUrl = `data:${file.mimeType};base64,${buffer.toString('base64')}`;
           }
         }
         return {
-          ...file,
+          id: file.id,
+          filename: file.filename,
+          mimeType: file.mimeType,
           size: file.size.toString(),
+          createdAt: file.createdAt,
           previewUrl,
         };
       }),
@@ -55,6 +52,14 @@ export class FilesService {
     entityId: string,
     file: Express.Multer.File,
   ) {
+    if (entityType === 'Patient') {
+      const patient = await this.prisma.patient.findFirst({
+        where: { id: entityId, organizationId, deletedAt: null },
+        select: { id: true },
+      });
+      if (!patient) throw new NotFoundException('Patient not found');
+    }
+
     const storageKey = this.storage.buildStorageKey(
       organizationId,
       entityType,
@@ -108,10 +113,19 @@ export class FilesService {
     });
     if (!file) throw new NotFoundException('File not found');
 
+    if (file.checksum?.startsWith('data:')) {
+      return { url: file.checksum, mimeType: file.mimeType, filename: file.filename };
+    }
+    const buffer = await this.storage.readLocal(file.storageKey);
+    if (buffer && file.mimeType.startsWith('image/')) {
+      return {
+        url: `data:${file.mimeType};base64,${buffer.toString('base64')}`,
+        mimeType: file.mimeType,
+        filename: file.filename,
+      };
+    }
     return {
-      url: file.checksum?.startsWith('data:')
-        ? file.checksum
-        : await this.storage.getUrl(file.storageKey, file.externalId ?? undefined),
+      url: `/api/v1/files/${file.id}/preview`,
       mimeType: file.mimeType,
       filename: file.filename,
     };

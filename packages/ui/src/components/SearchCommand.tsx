@@ -33,6 +33,7 @@ export function SearchCommand({
   const [activeIndex, setActiveIndex] = useState(0);
 
   const filtered = useMemo(() => {
+    if (onSearch) return items;
     if (!query.trim()) return items;
     const q = query.toLowerCase();
     return items.filter(
@@ -41,7 +42,7 @@ export function SearchCommand({
         item.description?.toLowerCase().includes(q) ||
         item.keywords?.some((k) => k.toLowerCase().includes(q)),
     );
-  }, [items, query]);
+  }, [items, query, onSearch]);
 
   const groups = useMemo(() => {
     const map = new Map<string, SearchCommandItem[]>();
@@ -82,7 +83,9 @@ export function SearchCommand({
   }, [open, onClose, flatItems, activeIndex]);
 
   useEffect(() => {
-    onSearch?.(query);
+    if (!onSearch) return;
+    const timer = window.setTimeout(() => onSearch(query), 300);
+    return () => window.clearTimeout(timer);
   }, [query, onSearch]);
 
   if (!open) return null;
@@ -111,7 +114,7 @@ export function SearchCommand({
         </div>
 
         <div className="max-h-80 overflow-y-auto p-2">
-          {loading && (
+          {loading && flatItems.length === 0 && (
             <div className="px-3 py-8 text-center text-sm text-integra-gray-600">
               Поиск...
             </div>
@@ -121,7 +124,7 @@ export function SearchCommand({
               Ничего не найдено
             </div>
           )}
-          {!loading &&
+          {flatItems.length > 0 &&
             Array.from(groups.entries()).map(([group, groupItems]) => (
               <div key={group} className="mb-2">
                 <p className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-integra-gray-400">

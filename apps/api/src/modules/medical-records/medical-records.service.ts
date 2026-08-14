@@ -11,24 +11,21 @@ export class MedicalRecordsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getByPatient(organizationId: string, patientId: string) {
-    const record = await this.getOrCreateRecord(organizationId, patientId);
+    const record = await this.prisma.medicalRecord.findFirst({
+      where: { organizationId, patientId, patient: { deletedAt: null } },
+    });
+    if (!record) {
+      return { visits: [] };
+    }
     return this.prisma.medicalRecord.findFirstOrThrow({
       where: { id: record.id },
       include: {
-        patient: true,
         visits: {
           orderBy: { visitedAt: 'desc' },
+          take: 12,
           include: {
-            staff: { select: { id: true, firstName: true, lastName: true } },
-            diagnoses: { orderBy: { createdAt: 'desc' } },
-            recommendations: { orderBy: { createdAt: 'desc' } },
-            measurements: true,
-          },
-        },
-        treatmentPlans: {
-          orderBy: { createdAt: 'desc' },
-          include: {
-            staff: { select: { id: true, firstName: true, lastName: true } },
+            diagnoses: { orderBy: { createdAt: 'desc' }, take: 20 },
+            recommendations: { orderBy: { createdAt: 'desc' }, take: 20 },
           },
         },
       },
@@ -163,18 +160,31 @@ export class MedicalRecordsService {
   async updateVisit(
     organizationId: string,
     visitId: string,
-    data: Prisma.VisitUpdateInput,
+    data: {
+      chiefComplaint?: string;
+      anamnesis?: string;
+      clinicalNotes?: string;
+      prescriptions?: string;
+      status?: VisitStatus;
+    },
   ) {
     await this.ensureVisit(organizationId, visitId);
     return this.prisma.visit.update({
       where: { id: visitId },
-      data,
+      data: {
+        ...(data.chiefComplaint !== undefined ? { chiefComplaint: data.chiefComplaint } : {}),
+        ...(data.anamnesis !== undefined ? { anamnesis: data.anamnesis } : {}),
+        ...(data.clinicalNotes !== undefined ? { clinicalNotes: data.clinicalNotes } : {}),
+        ...(data.prescriptions !== undefined ? { prescriptions: data.prescriptions } : {}),
+        ...(data.status !== undefined ? { status: data.status } : {}),
+      },
       include: { diagnoses: true, recommendations: true, measurements: true },
     });
   }
 
   async deleteVisit(organizationId: string, visitId: string) {
     await this.ensureVisit(organizationId, visitId);
+    await this.prisma.attachment.deleteMany({ where: { visitId } });
     await this.prisma.visit.delete({ where: { id: visitId } });
     return { success: true };
   }
@@ -274,5 +284,23 @@ export class MedicalRecordsService {
     });
     if (!visit) throw new NotFoundException('Visit not found');
     return visit;
+  }
+
+  async removeDiagnosis(organizationId: string, diagnosisId: string) {
+    const diagnosis = await this.prisma.diagnosis.findFirst({
+      where: { id: diagnosisId, visit: { organizationId } },
+    });
+    if (!diagnosis) throw new NotFoundException('Diagnosis not found');
+    await this.prisma.diagnosis.delete({ where: { id: diagnosisId } });
+    return { success: true };
+  }
+
+  async removeRecommendation(organizationId: string, recommendationId: string) {
+    const recommendation = await this.prisma.recommendation.findFirst({
+      where: { id: recommendationId, visit: { organizationId } },
+    });
+    if (!recommendation) throw new NotFoundException('Recommendation not found');
+    await this.prisma.recommendation.delete({ where: { id: recommendationId } });
+    return { success: true };
   }
 }

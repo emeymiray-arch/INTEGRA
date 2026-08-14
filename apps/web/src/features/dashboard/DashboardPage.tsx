@@ -1,13 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import {
-  Activity,
-  Calendar,
-  DollarSign,
-  TrendingUp,
-  Users,
-} from 'lucide-react';
-import { formatMoney } from '@integra/shared';
+import { Activity, Calendar, DollarSign, Users } from 'lucide-react';
+import { AppointmentStatus, asList, formatMoney } from '@integra/shared';
 import {
   Badge,
   Card,
@@ -22,17 +16,6 @@ import { apiClient, type ActivityItem, type Appointment, type DashboardStats } f
 import { cardItem, cardStagger } from '@/shared/lib/motion';
 import { formatDateTime, formatTime } from '@/shared/lib/format';
 import { appointmentBadgeVariant, appointmentStatusLabels } from '@/shared/lib/format';
-import { AppointmentStatus } from '@integra/shared';
-
-function asArray<T>(value: unknown): T[] {
-  if (Array.isArray(value)) return value as T[];
-  if (value && typeof value === 'object') {
-    const record = value as { data?: unknown; items?: unknown };
-    if (Array.isArray(record.items)) return record.items as T[];
-    if (Array.isArray(record.data)) return record.data as T[];
-  }
-  return [];
-}
 
 export function DashboardPage() {
   const { data: stats, isLoading: statsLoading } = useQuery({
@@ -43,24 +26,25 @@ export function DashboardPage() {
     },
   });
 
-  const { data: todayAppointments = [] } = useQuery({
+  const { data: todayAppointments = [], isLoading: todayLoading } = useQuery({
     queryKey: ['appointments', 'today'],
     queryFn: async () => {
-      const today = new Date().toISOString().split('T')[0];
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+      const end = new Date();
+      end.setHours(23, 59, 59, 999);
       const { data } = await apiClient.get('/appointments', {
-        params: { date: today, limit: 10 },
+        params: { from: start.toISOString(), to: end.toISOString(), limit: 10, page: 1 },
       });
-      return asArray<Appointment>(data);
+      return asList<Appointment>(data);
     },
   });
 
   const { data: activity = [] } = useQuery({
     queryKey: ['activity'],
     queryFn: async () => {
-      const { data } = await apiClient.get('/activity', {
-        params: { limit: 8 },
-      });
-      return asArray<ActivityItem>(data);
+      const { data } = await apiClient.get('/activity', { params: { limit: 8 } });
+      return asList<ActivityItem>(data);
     },
   });
 
@@ -89,7 +73,6 @@ export function DashboardPage() {
             title="Выручка сегодня"
             value={statsLoading ? '—' : formatMoney(stats?.todayRevenue ?? 0)}
             icon={<DollarSign className="h-6 w-6" />}
-            trend={{ value: '+12% к вчера', positive: true }}
           />
         </motion.div>
         <motion.div variants={cardItem}>
@@ -101,10 +84,9 @@ export function DashboardPage() {
         </motion.div>
         <motion.div variants={cardItem}>
           <StatCard
-            title="Загрузка"
-            value="78%"
-            subtitle="Средняя за неделю"
-            icon={<TrendingUp className="h-6 w-6" />}
+            title="Выручка за месяц"
+            value={statsLoading ? '—' : formatMoney(stats?.monthRevenue ?? 0)}
+            icon={<DollarSign className="h-6 w-6" />}
           />
         </motion.div>
       </motion.div>
@@ -115,7 +97,9 @@ export function DashboardPage() {
             <CardTitle>Записи на сегодня</CardTitle>
           </CardHeader>
           <CardContent>
-            {todayAppointments.length === 0 ? (
+            {todayLoading ? (
+              <p className="py-8 text-center text-sm text-integra-gray-600">Загрузка записей…</p>
+            ) : todayAppointments.length === 0 ? (
               <p className="py-8 text-center text-sm text-integra-gray-600">
                 Нет записей на сегодня
               </p>
@@ -124,7 +108,7 @@ export function DashboardPage() {
                 {todayAppointments.map((apt) => (
                   <div
                     key={apt.id}
-                    className="flex items-center justify-between rounded-xl border border-integra-gray-100 p-4 transition-colors hover:bg-primary/5"
+                    className="flex items-center justify-between rounded-xl border border-integra-gray-100 p-4"
                   >
                     <div>
                       <p className="font-medium text-integra-gray-900">
@@ -133,7 +117,8 @@ export function DashboardPage() {
                           : 'Пациент'}
                       </p>
                       <p className="text-sm text-integra-gray-600">
-                        {apt.service?.name} · {apt.staff ? `${apt.staff.lastName} ${apt.staff.firstName}` : ''}
+                        {apt.service?.name} ·{' '}
+                        {apt.staff ? `${apt.staff.lastName} ${apt.staff.firstName}` : ''}
                       </p>
                     </div>
                     <div className="text-right">
@@ -165,10 +150,7 @@ export function DashboardPage() {
               items={activity.map((item) => ({
                 id: item.id,
                 title: item.eventType.replace(/\./g, ' · '),
-                description: item.user
-                  ? `${item.user.lastName ?? ''} ${item.user.firstName ?? ''}`.trim() ||
-                    undefined
-                  : undefined,
+                description: item.user?.email,
                 date: formatDateTime(item.createdAt),
               }))}
             />
@@ -196,11 +178,15 @@ export function DashboardPage() {
                 </div>
               </div>
             ))}
-            {!stats?.popularServices?.length && (
+            {statsLoading ? (
               <p className="col-span-full py-4 text-center text-sm text-integra-gray-600">
-                Данные загружаются...
+                Загрузка…
               </p>
-            )}
+            ) : !stats?.popularServices?.length ? (
+              <p className="col-span-full py-4 text-center text-sm text-integra-gray-600">
+                Пока нет данных за этот месяц
+              </p>
+            ) : null}
           </div>
         </CardContent>
       </Card>

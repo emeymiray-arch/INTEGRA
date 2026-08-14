@@ -100,7 +100,7 @@ export class StaffController {
   constructor(private readonly staffService: StaffService) {}
 
   @Get()
-  @RequirePermissions(PERMISSIONS.STAFF_READ)
+  @RequirePermissions(PERMISSIONS.STAFF_READ, PERMISSIONS.APPOINTMENTS_READ)
   findAll(@CurrentUser() user: AuthUser, @Query('search') search?: string) {
     return this.staffService.findAll(user.organizationId, search);
   }
@@ -114,7 +114,10 @@ export class StaffController {
   @Post()
   @RequirePermissions(PERMISSIONS.STAFF_WRITE)
   create(@CurrentUser() user: AuthUser, @Body() dto: CreateStaffDto) {
-    return this.staffService.create(user.organizationId, dto, user.staffId);
+    return this.staffService.create(user.organizationId, dto, {
+      userId: user.userId,
+      staffId: user.staffId,
+    });
   }
 
   @Patch(':id')

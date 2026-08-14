@@ -19,9 +19,10 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  MinLength,
 } from 'class-validator';
 import { Gender, PatientSource, PatientStatus } from '@prisma/client';
-import { PERMISSIONS } from '@integra/shared';
+import { clampLimit, clampPage, PERMISSIONS } from '@integra/shared';
 import { Request } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
@@ -32,9 +33,11 @@ import { PatientsService } from './patients.service';
 
 class CreatePatientDto {
   @IsString()
+  @MinLength(1)
   firstName!: string;
 
   @IsString()
+  @MinLength(1)
   lastName!: string;
 
   @IsOptional()
@@ -50,6 +53,7 @@ class CreatePatientDto {
   gender?: Gender;
 
   @IsString()
+  @MinLength(5)
   phone!: string;
 
   @IsOptional()
@@ -97,6 +101,55 @@ class CreatePatientDto {
   status?: PatientStatus;
 }
 
+class UpdatePatientDto {
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  firstName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  lastName?: string;
+
+  @IsOptional()
+  @IsString()
+  middleName?: string;
+
+  @IsOptional()
+  @IsDateString()
+  birthDate?: string;
+
+  @IsOptional()
+  @IsEnum(Gender)
+  gender?: Gender;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(5)
+  phone?: string;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+
+  @IsOptional()
+  @IsString()
+  allergies?: string;
+
+  @IsOptional()
+  @IsString()
+  contraindications?: string;
+
+  @IsOptional()
+  @IsString()
+  chronicDiseases?: string;
+
+  @IsOptional()
+  @IsEnum(PatientStatus)
+  status?: PatientStatus;
+}
+
 @ApiTags('patients')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, PermissionsGuard)
@@ -115,8 +168,8 @@ export class PatientsController {
     return this.patientsService.findAll(
       user.organizationId,
       search,
-      page ? Number(page) : 1,
-      limit ? Number(limit) : 20,
+      clampPage(page),
+      clampLimit(limit, 20, 50),
     );
   }
 
@@ -137,7 +190,7 @@ export class PatientsController {
   update(
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
-    @Body() dto: Partial<CreatePatientDto>,
+    @Body() dto: UpdatePatientDto,
     @Req() req: Request,
   ) {
     return this.patientsService.update(

@@ -32,8 +32,8 @@ export class LocalStorageAdapter implements StorageProvider {
     }
   }
 
-  async getUrl(key: string) {
-    return `/api/v1/files/preview/${encodeURIComponent(key)}`;
+  async getUrl(_key: string) {
+    return '';
   }
 
   async read(key: string) {

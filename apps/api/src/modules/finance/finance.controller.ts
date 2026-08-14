@@ -16,7 +16,7 @@ import {
   Min,
 } from 'class-validator';
 import { DiscountType } from '@prisma/client';
-import { PERMISSIONS } from '@integra/shared';
+import { clampLimit, clampPage, PERMISSIONS } from '@integra/shared';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -62,8 +62,15 @@ export class FinanceController {
   findInvoices(
     @CurrentUser() user: AuthUser,
     @Query('patientId') patientId?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
   ) {
-    return this.financeService.findInvoices(user.organizationId, patientId);
+    return this.financeService.findInvoices(
+      user.organizationId,
+      patientId,
+      clampPage(page),
+      clampLimit(limit, 20, 50),
+    );
   }
 
   @Get('invoices/:id')

@@ -1,7 +1,9 @@
 import { AxiosError } from 'axios';
 
 export function apiErrorMessage(error: unknown, fallback = 'Не удалось сохранить') {
-  if (!(error instanceof AxiosError)) return fallback;
+  if (!(error instanceof AxiosError)) {
+    return error instanceof Error && error.message ? error.message : fallback;
+  }
   const raw = error.response?.data;
   const message =
     typeof raw === 'object' && raw && 'message' in raw

@@ -24,6 +24,7 @@ export interface AuthState {
   staff: AuthStaff | null;
   permissions: string[];
   isAuthenticated: boolean;
+  hasHydrated: boolean;
   setAuth: (data: {
     accessToken: string;
     refreshToken: string;
@@ -44,6 +45,7 @@ export const useAuthStore = create<AuthState>()(
       staff: null,
       permissions: [],
       isAuthenticated: false,
+      hasHydrated: false,
       setAuth: ({ accessToken, refreshToken, user, staff, permissions }) =>
         set({
           accessToken,
@@ -75,6 +77,9 @@ export const useAuthStore = create<AuthState>()(
         permissions: state.permissions,
         isAuthenticated: state.isAuthenticated,
       }),
+      onRehydrateStorage: () => () => {
+        useAuthStore.setState({ hasHydrated: true });
+      },
     },
   ),
 );

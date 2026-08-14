@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   UnauthorizedException,
@@ -218,6 +219,13 @@ export class AuthService {
     if (!stored?.user?.staff) {
       throw new UnauthorizedException('Invalid refresh token');
     }
+    if (
+      !stored.user.isActive ||
+      !stored.user.staff.isActive ||
+      stored.user.staff.deletedAt
+    ) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
 
     await this.prisma.refreshToken.update({
       where: { id: stored.id },
@@ -260,6 +268,20 @@ export class AuthService {
       });
     }
 
+    return { success: true };
+  }
+
+  async changePassword(userId: string, currentPassword: string, newPassword: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new UnauthorizedException('User not found');
+    const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!valid) {
+      throw new BadRequestException('Неверный текущий пароль');
+    }
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash: await bcrypt.hash(newPassword, 12) },
+    });
     return { success: true };
   }
 
@@ -309,6 +331,7 @@ export class AuthService {
     const staff = await this.prisma.staff.findFirst({
       where: { id: payload.staffId, deletedAt: null },
       include: {
+        user: { select: { isActive: true } },
         staffRoles: {
           where: { revokedAt: null },
           include: { role: true },
@@ -316,12 +339,11 @@ export class AuthService {
       },
     });
 
-    if (!staff) {
+    if (!staff || !staff.isActive || !staff.user.isActive) {
       throw new UnauthorizedException('Staff profile not found');
     }
 
-    const dbRoles = staff.staffRoles.map((sr) => sr.role.code as RoleCode);
-    const roles = dbRoles.length ? dbRoles : (payload.roles ?? []);
+    const roles = staff.staffRoles.map((sr) => sr.role.code as RoleCode);
 
     return {
       userId: payload.sub,

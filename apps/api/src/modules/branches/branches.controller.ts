@@ -53,7 +53,7 @@ export class BranchesController {
   constructor(private readonly branchesService: BranchesService) {}
 
   @Get()
-  @RequirePermissions(PERMISSIONS.SETTINGS_READ)
+  @RequirePermissions(PERMISSIONS.SETTINGS_READ, PERMISSIONS.APPOINTMENTS_READ)
   findAll(@CurrentUser() user: AuthUser) {
     return this.branchesService.findAll(user.organizationId);
   }

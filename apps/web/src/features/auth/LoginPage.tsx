@@ -1,7 +1,7 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { loginSchema, type LoginInput } from '@integra/shared';
 import { Button, Card, Input } from '@integra/ui';
 import { apiClient } from '@/shared/api/client';
@@ -25,6 +25,7 @@ type AuthResponse = {
 
 export function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const setAuth = useAuthStore((s) => s.setAuth);
 
   const {
@@ -49,7 +50,8 @@ export function LoginPage() {
         staff: data.staff,
         permissions: data.permissions,
       });
-      navigate('/');
+      const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname;
+      navigate(from && from !== '/login' ? from : '/');
     },
   });
 

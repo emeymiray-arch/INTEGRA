@@ -1,10 +1,12 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { asList } from '@integra/shared';
 import { Button, Input, Modal } from '@integra/ui';
 import { apiClient, type Patient, type Service, type StaffMember } from '@/shared/api/client';
 import { apiErrorMessage } from '@/shared/api/errorMessage';
 import { fullName } from '@/shared/lib/format';
+import { useDebouncedValue } from '@/shared/lib/useDebouncedValue';
 import { SelectField } from '@/shared/ui/SelectField';
 
 interface AppointmentForm {
@@ -29,18 +31,10 @@ interface CreateAppointmentDialogProps {
   onClose: () => void;
 }
 
-function asList<T>(value: unknown): T[] {
-  if (Array.isArray(value)) return value as T[];
-  if (value && typeof value === 'object') {
-    const record = value as { data?: unknown; items?: unknown };
-    if (Array.isArray(record.items)) return record.items as T[];
-    if (Array.isArray(record.data)) return record.data as T[];
-  }
-  return [];
-}
-
 export function CreateAppointmentDialog({ open, onClose }: CreateAppointmentDialogProps) {
   const queryClient = useQueryClient();
+  const [patientQuery, setPatientQuery] = useState('');
+  const debouncedPatient = useDebouncedValue(patientQuery, 300);
   const {
     register,
     handleSubmit,
@@ -50,10 +44,12 @@ export function CreateAppointmentDialog({ open, onClose }: CreateAppointmentDial
     defaultValues: { patientId: '', staffId: '', serviceId: '', startsAt: '' },
   });
 
-  const { data: patients = [] } = useQuery({
-    queryKey: ['patients', 'picker'],
+  const { data: patients = [], isLoading: patientsLoading } = useQuery({
+    queryKey: ['patients', 'picker', debouncedPatient],
     queryFn: async () => {
-      const { data } = await apiClient.get('/patients', { params: { limit: 100 } });
+      const { data } = await apiClient.get('/patients', {
+        params: { limit: 20, search: debouncedPatient || undefined },
+      });
       return asList<Patient>(data);
     },
     enabled: open,
@@ -87,7 +83,10 @@ export function CreateAppointmentDialog({ open, onClose }: CreateAppointmentDial
   });
 
   useEffect(() => {
-    if (!open) reset();
+    if (!open) {
+      reset();
+      setPatientQuery('');
+    }
   }, [open, reset]);
 
   const mutation = useMutation({
@@ -137,6 +136,12 @@ export function CreateAppointmentDialog({ open, onClose }: CreateAppointmentDial
         className="space-y-3"
         onSubmit={handleSubmit((values) => mutation.mutate(values))}
       >
+        <Input
+          label="Найти пациента"
+          value={patientQuery}
+          onChange={(e) => setPatientQuery(e.target.value)}
+          placeholder="Имя или телефон"
+        />
         <SelectField
           label="Пациент"
           error={errors.patientId?.message}
@@ -145,7 +150,7 @@ export function CreateAppointmentDialog({ open, onClose }: CreateAppointmentDial
           <option value="">Выберите пациента</option>
           {patients.map((patient) => (
             <option key={patient.id} value={patient.id}>
-              {fullName(patient)}
+              {fullName(patient)} · {patient.phone}
             </option>
           ))}
         </SelectField>
@@ -179,11 +184,13 @@ export function CreateAppointmentDialog({ open, onClose }: CreateAppointmentDial
           error={errors.startsAt?.message}
           {...register('startsAt', { required: 'Укажите дату и время' })}
         />
-        {patients.length === 0 && (
-          <p className="text-xs text-integra-gray-600">Сначала добавьте пациента.</p>
+        {patientsLoading && (
+          <p className="text-xs text-integra-gray-600">Ищем пациентов…</p>
         )}
-        {services.length === 0 && (
-          <p className="text-xs text-integra-gray-600">Сначала добавьте услугу.</p>
+        {!patientsLoading && patients.length === 0 && (
+          <p className="text-xs text-integra-gray-600">
+            Пациент не найден — добавьте его в разделе «Пациенты».
+          </p>
         )}
         {mutation.isError && (
           <p className="text-sm text-integra-error">{apiErrorMessage(mutation.error)}</p>

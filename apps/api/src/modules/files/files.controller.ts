@@ -34,6 +34,16 @@ export class FilesController {
     @Query('entityType') entityType: string,
     @Query('entityId') entityId: string,
   ) {
+    if (!entityType || !entityId) {
+      throw new BadRequestException('Укажите entityType и entityId');
+    }
+    if (
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        entityId,
+      )
+    ) {
+      throw new BadRequestException('Некорректный идентификатор');
+    }
     return this.filesService.findByEntity(user.organizationId, entityType, entityId);
   }
 
@@ -42,7 +52,7 @@ export class FilesController {
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(
     FileInterceptor('file', {
-      limits: { fileSize: 8 * 1024 * 1024 },
+      limits: { fileSize: 2 * 1024 * 1024 },
     }),
   )
   upload(
@@ -53,6 +63,16 @@ export class FilesController {
   ) {
     if (!file?.buffer) {
       throw new BadRequestException('Выберите фото для загрузки');
+    }
+    if (!entityType?.trim() || !entityId?.trim()) {
+      throw new BadRequestException('Укажите entityType и entityId');
+    }
+    if (
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        entityId,
+      )
+    ) {
+      throw new BadRequestException('Некорректный идентификатор');
     }
     return this.filesService.upload(
       user.organizationId,

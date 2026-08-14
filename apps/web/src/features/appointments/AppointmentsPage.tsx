@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
-import { formatMoney } from '@integra/shared';
+import { asList, formatMoney } from '@integra/shared';
 import { AppointmentStatus } from '@integra/shared';
 import {
   Badge,
@@ -18,23 +18,38 @@ import {
   fullName,
 } from '@/shared/lib/format';
 import { CreateAppointmentDialog } from './CreateAppointmentDialog';
+import { PERMISSIONS, useCan } from '@/shared/lib/permissions';
+import { apiErrorMessage } from '@/shared/api/errorMessage';
 
 export function AppointmentsPage() {
+  const queryClient = useQueryClient();
+  const canWriteAppointments = useCan(PERMISSIONS.APPOINTMENTS_WRITE);
   const [page, setPage] = useState(1);
   const [createOpen, setCreateOpen] = useState(false);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ['appointments', page],
     queryFn: async () => {
       const { data } = await apiClient.get('/appointments', {
         params: { page, limit: 20 },
       });
-      return data;
+      return data as { items?: Appointment[]; total?: number; page?: number; limit?: number };
     },
   });
 
-  const appointments: Appointment[] = Array.isArray(data) ? data : (data?.data ?? []);
-  const meta = data?.meta ?? { page: 1, totalPages: 1 };
+  const appointments = asList<Appointment>(data);
+  const totalPages = Math.max(1, Math.ceil((data?.total ?? appointments.length) / (data?.limit ?? 20)));
+
+  const cancel = useMutation({
+    mutationFn: async (id: string) => {
+      await apiClient.patch(`/appointments/${id}/status`, { status: 'CANCELLED' });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
+      queryClient.invalidateQueries({ queryKey: ['schedule'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+  });
 
   const columns: DataTableColumn<Appointment>[] = [
     {
@@ -60,15 +75,31 @@ export function AppointmentsPage() {
     {
       key: 'finalPrice',
       header: 'Стоимость',
-      render: (row) => formatMoney(row.finalPrice),
+      render: (row) => formatMoney(Number(row.finalPrice)),
     },
     {
       key: 'status',
       header: 'Статус',
       render: (row) => (
-        <Badge variant={appointmentBadgeVariant[row.status as AppointmentStatus] ?? 'muted'}>
-          {appointmentStatusLabels[row.status as AppointmentStatus] ?? row.status}
-        </Badge>
+        <div className="flex items-center gap-2">
+          <Badge variant={appointmentBadgeVariant[row.status as AppointmentStatus] ?? 'muted'}>
+            {appointmentStatusLabels[row.status as AppointmentStatus] ?? row.status}
+          </Badge>
+          {canWriteAppointments &&
+            row.status !== 'CANCELLED' &&
+            row.status !== 'COMPLETED' && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (window.confirm('Отменить эту запись?')) cancel.mutate(row.id);
+              }}
+            >
+              Отменить
+            </Button>
+          )}
+        </div>
       ),
     },
   ];
@@ -77,23 +108,35 @@ export function AppointmentsPage() {
     <div>
       <PageHeader
         title="Записи"
-        description="Управление записями на приём"
+        description="Все записи, новые сверху"
         actions={
+          canWriteAppointments ? (
           <Button onClick={() => setCreateOpen(true)}>
             <Plus className="h-4 w-4" />
             Новая запись
           </Button>
+          ) : undefined
         }
       />
+
+      {isError && (
+        <p className="mb-4 text-sm text-integra-error">Не удалось загрузить записи</p>
+      )}
+      {cancel.isError && (
+        <p className="mb-4 text-sm text-integra-error">
+          {apiErrorMessage(cancel.error, 'Не удалось отменить запись')}
+        </p>
+      )}
 
       <DataTable
         columns={columns}
         data={appointments}
         keyExtractor={(row) => row.id}
         loading={isLoading}
-        page={meta.page}
-        totalPages={meta.totalPages}
+        page={data?.page ?? page}
+        totalPages={totalPages}
         onPageChange={setPage}
+        emptyMessage="Записей нет"
       />
       <CreateAppointmentDialog open={createOpen} onClose={() => setCreateOpen(false)} />
     </div>

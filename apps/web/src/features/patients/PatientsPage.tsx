@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Users } from 'lucide-react';
-import { calculateAge } from '@integra/shared';
+import { asList, calculateAge } from '@integra/shared';
 import {
   Badge,
   Button,
@@ -14,6 +14,7 @@ import {
 } from '@integra/ui';
 import { apiClient, type Patient } from '@/shared/api/client';
 import { fullName } from '@/shared/lib/format';
+import { useDebouncedValue } from '@/shared/lib/useDebouncedValue';
 import { CreatePatientDialog } from './CreatePatientDialog';
 
 const statusVariant: Record<string, 'success' | 'muted' | 'warning' | 'info'> = {
@@ -35,33 +36,21 @@ export function PatientsPage() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [createOpen, setCreateOpen] = useState(false);
+  const debouncedSearch = useDebouncedValue(search, 300);
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['patients', page, search],
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['patients', page, debouncedSearch],
     queryFn: async () => {
-      const { data } = await apiClient.get<{
-        items?: Patient[];
-        data?: Patient[];
-        page?: number;
-        limit?: number;
-        total?: number;
-        meta?: { page?: number; totalPages?: number };
-      }>('/patients', {
-        params: { page, limit: 20, search: search || undefined },
+      const { data } = await apiClient.get('/patients', {
+        params: { page, limit: 20, search: debouncedSearch || undefined },
       });
-      return data;
+      return data as { items?: Patient[]; total?: number; page?: number; limit?: number };
     },
+    placeholderData: keepPreviousData,
   });
 
-  const patients: Patient[] = Array.isArray(data)
-    ? data
-    : ((data?.items ?? data?.data ?? []) as Patient[]);
-  const meta = {
-    page: data?.page ?? data?.meta?.page ?? 1,
-    totalPages:
-      data?.meta?.totalPages ??
-      Math.max(1, Math.ceil((data?.total ?? patients.length) / (data?.limit ?? 20))),
-  };
+  const patients = asList<Patient>(data);
+  const totalPages = Math.max(1, Math.ceil((data?.total ?? patients.length) / (data?.limit ?? 20)));
 
   const columns: DataTableColumn<Patient>[] = [
     {
@@ -90,7 +79,7 @@ export function PatientsPage() {
     <div>
       <PageHeader
         title="Пациенты"
-        description="Управление карточками пациентов"
+        description="Карточки пациентов, по 20 на страницу"
         actions={
           <Button onClick={() => setCreateOpen(true)}>
             <Plus className="h-4 w-4" />
@@ -110,6 +99,10 @@ export function PatientsPage() {
         />
       </div>
 
+      {isError && (
+        <p className="mb-4 text-sm text-integra-error">Не удалось загрузить пациентов</p>
+      )}
+
       {!isLoading && patients.length === 0 ? (
         <EmptyState
           icon={<Users className="h-7 w-7" />}
@@ -123,8 +116,8 @@ export function PatientsPage() {
           data={patients}
           keyExtractor={(row) => row.id}
           loading={isLoading}
-          page={meta.page}
-          totalPages={meta.totalPages}
+          page={data?.page ?? page}
+          totalPages={totalPages}
           onPageChange={setPage}
           onRowClick={(row) => navigate(`/patients/${row.id}`)}
         />

@@ -6,7 +6,8 @@
   "types": "./dist/index.d.ts",
   "scripts": {
     "build": "tsc",
-    "dev": "tsc --watch"
+    "dev": "tsc --watch",
+    "test": "node --experimental-strip-types --test src/utils.spec.ts"
   },
   "dependencies": {
     "zod": "^3.25.67"

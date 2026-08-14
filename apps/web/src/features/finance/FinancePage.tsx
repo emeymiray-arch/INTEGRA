@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { formatMoney } from '@integra/shared';
+import { asList, formatMoney } from '@integra/shared';
 import {
   Badge,
   DataTable,
@@ -10,7 +10,7 @@ import {
 } from '@integra/ui';
 import { DollarSign, FileText, TrendingUp } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { apiClient, type Invoice } from '@/shared/api/client';
+import { apiClient, type DashboardStats, type Invoice } from '@/shared/api/client';
 import { cardItem, cardStagger } from '@/shared/lib/motion';
 import { formatDate } from '@/shared/lib/format';
 
@@ -35,26 +35,26 @@ const invoiceStatusLabels: Record<string, string> = {
 export function FinancePage() {
   const [page, setPage] = useState(1);
 
-  const { data: revenue } = useQuery({
-    queryKey: ['revenue'],
+  const { data: stats } = useQuery({
+    queryKey: ['dashboard'],
     queryFn: async () => {
-      const { data } = await apiClient.get('/analytics/revenue');
+      const { data } = await apiClient.get<DashboardStats>('/analytics/dashboard');
       return data;
     },
   });
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ['invoices', page],
     queryFn: async () => {
-      const { data } = await apiClient.get('/invoices', {
+      const { data } = await apiClient.get('/finance/invoices', {
         params: { page, limit: 20 },
       });
-      return data;
+      return data as { items?: Invoice[]; total?: number; page?: number; limit?: number };
     },
   });
 
-  const invoices: Invoice[] = data?.data ?? [];
-  const meta = data?.meta ?? { page: 1, totalPages: 1 };
+  const invoices = asList<Invoice>(data);
+  const totalPages = Math.max(1, Math.ceil((data?.total ?? invoices.length) / (data?.limit ?? 20)));
 
   const columns: DataTableColumn<Invoice>[] = [
     { key: 'number', header: 'Номер' },
@@ -76,21 +76,17 @@ export function FinancePage() {
     {
       key: 'totalAmount',
       header: 'Сумма',
-      render: (row) => formatMoney(row.totalAmount),
+      render: (row) => formatMoney(Number(row.totalAmount)),
     },
     {
       key: 'paidAmount',
       header: 'Оплачено',
-      render: (row) => formatMoney(row.paidAmount),
+      render: (row) => formatMoney(Number(row.paidAmount)),
     },
     {
       key: 'balance',
       header: 'Остаток',
-      render: (row) => (
-        <span className={row.balance > 0 ? 'font-medium text-accent' : ''}>
-          {formatMoney(row.balance)}
-        </span>
-      ),
+      render: (row) => formatMoney(Number(row.balance)),
     },
     {
       key: 'issuedAt',
@@ -101,10 +97,7 @@ export function FinancePage() {
 
   return (
     <div>
-      <PageHeader
-        title="Финансы"
-        description="Счета, оплаты и финансовая аналитика"
-      />
+      <PageHeader title="Финансы" description="Счета и оплаты" />
 
       <motion.div
         className="mb-8 grid gap-4 sm:grid-cols-3"
@@ -115,34 +108,37 @@ export function FinancePage() {
         <motion.div variants={cardItem}>
           <StatCard
             title="Выручка за месяц"
-            value={formatMoney(revenue?.monthly ?? 0)}
+            value={formatMoney(stats?.monthRevenue ?? 0)}
             icon={<DollarSign className="h-6 w-6" />}
           />
         </motion.div>
         <motion.div variants={cardItem}>
           <StatCard
-            title="Счетов выставлено"
-            value={revenue?.invoicesCount ?? 0}
+            title="Неоплаченные счета"
+            value={stats?.pendingInvoices ?? 0}
             icon={<FileText className="h-6 w-6" />}
           />
         </motion.div>
         <motion.div variants={cardItem}>
           <StatCard
-            title="Средний чек"
-            value={formatMoney(revenue?.averageCheck ?? 0)}
+            title="Выручка сегодня"
+            value={formatMoney(stats?.todayRevenue ?? 0)}
             icon={<TrendingUp className="h-6 w-6" />}
-            trend={{ value: '+8% к прошлому месяцу', positive: true }}
           />
         </motion.div>
       </motion.div>
+
+      {isError && (
+        <p className="mb-4 text-sm text-integra-error">Не удалось загрузить счета</p>
+      )}
 
       <DataTable
         columns={columns}
         data={invoices}
         keyExtractor={(row) => row.id}
         loading={isLoading}
-        page={meta.page}
-        totalPages={meta.totalPages}
+        page={data?.page ?? page}
+        totalPages={totalPages}
         onPageChange={setPage}
         emptyMessage="Счета отсутствуют"
       />

@@ -46,6 +46,7 @@ export class ServicesCatalogService {
       },
       include: { category: true },
       orderBy: { name: 'asc' },
+      take: 100,
     });
   }
 

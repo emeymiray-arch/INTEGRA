@@ -24,6 +24,13 @@ type MeResponse = {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { isAuthenticated, accessToken, setAuth, logout } = useAuthStore();
 
+  useEffect(() => {
+    const finish = () => useAuthStore.setState({ hasHydrated: true });
+    const persistApi = useAuthStore.persist;
+    if (persistApi.hasHydrated()) finish();
+    return persistApi.onFinishHydration(finish);
+  }, []);
+
   const { isLoading } = useQuery({
     queryKey: ['auth', 'me'],
     queryFn: async () => {

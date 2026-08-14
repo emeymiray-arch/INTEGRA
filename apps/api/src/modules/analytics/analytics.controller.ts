@@ -25,15 +25,15 @@ export class AnalyticsController {
   @RequirePermissions(PERMISSIONS.ANALYTICS_READ)
   getRevenue(
     @CurrentUser() user: AuthUser,
-    @Query('from') from: string,
-    @Query('to') to: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
     @Query('groupBy') groupBy?: 'day' | 'week' | 'month',
   ) {
     return this.analyticsService.getRevenue(
       user.organizationId,
       from,
       to,
-      groupBy ?? 'day',
+      groupBy ?? 'month',
     );
   }
 }

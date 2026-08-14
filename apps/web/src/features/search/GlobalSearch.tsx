@@ -1,12 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import {
-  Calendar,
-  Stethoscope,
-  UserCog,
-  Users,
-} from 'lucide-react';
+import { Calendar, Stethoscope, UserCog, Users } from 'lucide-react';
+import { flattenSearch } from '@integra/shared';
 import { SearchCommand, type SearchCommandItem } from '@integra/ui';
 import { apiClient, type SearchResult } from '@/shared/api/client';
 
@@ -37,8 +33,8 @@ export function GlobalSearch({ open, onClose }: GlobalSearchProps) {
     queryKey: ['search', query],
     queryFn: async () => {
       if (!query.trim()) return [];
-      const { data } = await apiClient.get('/search', { params: { q: query } });
-      return (data?.results ?? data ?? []) as SearchResult[];
+      const { data } = await apiClient.get('/search', { params: { q: query, limit: 10 } });
+      return flattenSearch(data) as SearchResult[];
     },
     enabled: open && query.trim().length >= 2,
   });
