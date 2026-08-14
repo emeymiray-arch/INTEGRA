@@ -4,6 +4,7 @@ import { useMutation } from '@tanstack/react-query';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { loginSchema, type LoginInput } from '@integra/shared';
 import { Button, Card, Input } from '@integra/ui';
+import { AxiosError } from 'axios';
 import { apiClient } from '@/shared/api/client';
 import { unwrapData } from '@/shared/api/unwrap';
 import { useAuthStore } from '@/shared/stores/authStore';
@@ -91,7 +92,12 @@ export function LoginPage() {
 
         {loginMutation.isError && (
           <p className="rounded-lg bg-integra-error/10 px-3 py-2 text-sm text-integra-error">
-            Неверный email или пароль
+            {loginMutation.error instanceof AxiosError && !loginMutation.error.response
+              ? 'Нет связи с сервером. Проверьте интернет и подождите минуту.'
+              : loginMutation.error instanceof AxiosError &&
+                  loginMutation.error.response?.status === 503
+                ? 'Система временно недоступна. Обычно это пауза базы — войдите через минуту. Если не открывается сутки, проверьте оплату Neon и Vercel.'
+                : 'Неверный email или пароль'}
           </p>
         )}
 

@@ -8,7 +8,7 @@ export default () => ({
     accessSecret: process.env.JWT_ACCESS_SECRET ?? 'dev-access-secret-change-in-production',
     refreshSecret: process.env.JWT_REFRESH_SECRET ?? 'dev-refresh-secret-change-in-production',
     accessTtl: process.env.JWT_ACCESS_TTL ?? '15m',
-    refreshTtl: process.env.JWT_REFRESH_TTL ?? '7d',
+    refreshTtl: process.env.JWT_REFRESH_TTL ?? '30d',
   },
   storage: {
     provider: process.env.STORAGE_PROVIDER ?? 'local',

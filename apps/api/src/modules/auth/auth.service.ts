@@ -180,6 +180,8 @@ export class AuthService {
       data: { lastLoginAt: new Date() },
     });
 
+    void this.purgeExpiredTokens();
+
     await this.activity.log({
       organizationId: user.staff.organizationId,
       userId: user.id,
@@ -217,14 +219,14 @@ export class AuthService {
     });
 
     if (!stored?.user?.staff) {
-      throw new UnauthorizedException('Invalid refresh token');
+      throw new UnauthorizedException('Сессия истекла. Войдите снова.');
     }
     if (
       !stored.user.isActive ||
       !stored.user.staff.isActive ||
       stored.user.staff.deletedAt
     ) {
-      throw new UnauthorizedException('Invalid refresh token');
+      throw new UnauthorizedException('Сессия истекла. Войдите снова.');
     }
 
     await this.prisma.refreshToken.update({
@@ -273,7 +275,7 @@ export class AuthService {
 
   async changePassword(userId: string, currentPassword: string, newPassword: string) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user) throw new UnauthorizedException('User not found');
+    if (!user) throw new UnauthorizedException('Пользователь не найден');
     const valid = await bcrypt.compare(currentPassword, user.passwordHash);
     if (!valid) {
       throw new BadRequestException('Неверный текущий пароль');
@@ -302,7 +304,7 @@ export class AuthService {
     });
 
     if (!user?.staff) {
-      throw new UnauthorizedException('Staff profile not found');
+      throw new UnauthorizedException('Профиль сотрудника не найден');
     }
 
     const roles = user.staff.staffRoles.map((sr) => sr.role.code as RoleCode);
@@ -340,7 +342,7 @@ export class AuthService {
     });
 
     if (!staff || !staff.isActive || !staff.user.isActive) {
-      throw new UnauthorizedException('Staff profile not found');
+      throw new UnauthorizedException('Профиль сотрудника не найден');
     }
 
     const roles = staff.staffRoles.map((sr) => sr.role.code as RoleCode);
@@ -503,13 +505,19 @@ export class AuthService {
     return latin || `org-${Date.now().toString(36)}`;
   }
 
+  private async purgeExpiredTokens() {
+    await this.prisma.refreshToken.deleteMany({
+      where: { expiresAt: { lt: new Date() } },
+    });
+  }
+
   private hashToken(token: string) {
     return createHash('sha256').update(token).digest('hex');
   }
 
   private parseTtl(ttl: string): Date {
     const match = ttl.match(/^(\d+)([smhd])$/);
-    if (!match) return new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    if (!match) return new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
     const value = parseInt(match[1], 10);
     const unit = match[2];
     const ms =

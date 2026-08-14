@@ -23,12 +23,37 @@ async function bootstrap(): Promise<Application> {
     expressApp.use(express.urlencoded({ extended: true }));
 
     // Lightweight probe that does not need Nest bootstrap completion diagnostics.
-    expressApp.get('/api/health', (_req, res) => {
-      res.status(200).json({
-        ok: true,
-        hasDbUrl: Boolean(process.env.DATABASE_URL),
-        node: process.version,
-      });
+    expressApp.get('/api/health', async (_req, res) => {
+      const hasDbUrl = Boolean(process.env.DATABASE_URL);
+      if (!hasDbUrl) {
+        res.status(503).json({
+          ok: false,
+          db: 'missing',
+          message: 'База не настроена',
+        });
+        return;
+      }
+      try {
+        const { Pool } = await import('pg');
+        const pool = new Pool({
+          connectionString: process.env.DATABASE_URL,
+          max: 1,
+          connectionTimeoutMillis: 4000,
+          ssl: process.env.DATABASE_URL?.includes('localhost')
+            ? undefined
+            : { rejectUnauthorized: false },
+        });
+        await pool.query('select 1');
+        await pool.end();
+        res.status(200).json({ ok: true, db: 'up' });
+      } catch {
+        res.status(503).json({
+          ok: false,
+          db: 'down',
+          message:
+            'База данных недоступна. Подождите минуту. Если не открывается сутки — проверьте оплату Neon.',
+        });
+      }
     });
 
     const app = await NestFactory.create(AppModule, new ExpressAdapter(expressApp), {
@@ -125,7 +150,7 @@ export default async function handler(req: Request, res: Response): Promise<void
           data: null,
           error: {
             code: 'FUNCTION_INVOCATION_FAILED',
-            message,
+            message: 'Сервис временно недоступен. Повторите вход через минуту.',
             url: req.url,
             method: req.method,
           },

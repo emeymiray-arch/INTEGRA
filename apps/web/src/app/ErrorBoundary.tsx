@@ -29,7 +29,7 @@ export class ErrorBoundary extends Component<Props, State> {
       <div className="flex min-h-screen flex-col items-center justify-center bg-background px-6 text-center">
         <h1 className="text-2xl font-bold text-integra-gray-900">Не удалось открыть экран</h1>
         <p className="mt-2 max-w-md text-sm text-integra-gray-600">
-          {this.state.error.message || 'Неизвестная ошибка интерфейса'}
+          Обновите страницу. Записи и пациенты на месте — это сбой экрана, не данных.
         </p>
         <div className="mt-6 flex gap-3">
           <button

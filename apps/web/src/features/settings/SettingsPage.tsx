@@ -8,11 +8,6 @@ interface Organization {
   name: string;
   email?: string | null;
   phone?: string | null;
-  settings?: {
-    smsReminders?: boolean;
-    emailNotifications?: boolean;
-    pushNotifications?: boolean;
-  };
 }
 
 export function SettingsPage() {
@@ -20,9 +15,6 @@ export function SettingsPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [smsReminders, setSmsReminders] = useState(true);
-  const [emailNotifications, setEmailNotifications] = useState(false);
-  const [pushNotifications, setPushNotifications] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -40,9 +32,6 @@ export function SettingsPage() {
     setName(organization.name ?? '');
     setEmail(organization.email ?? '');
     setPhone(organization.phone ?? '');
-    setSmsReminders(Boolean(organization.settings?.smsReminders ?? true));
-    setEmailNotifications(Boolean(organization.settings?.emailNotifications));
-    setPushNotifications(Boolean(organization.settings?.pushNotifications));
   }, [organization]);
 
   const saveOrg = useMutation({
@@ -51,7 +40,6 @@ export function SettingsPage() {
         name: name.trim(),
         email: email.trim() || undefined,
         phone: phone.trim() || undefined,
-        settings: { smsReminders, emailNotifications, pushNotifications },
       });
       return data;
     },
@@ -77,7 +65,7 @@ export function SettingsPage() {
 
   return (
     <div>
-      <PageHeader title="Настройки" description="Параметры организации и безопасности" />
+      <PageHeader title="Настройки" description="Название клиники и пароль входа" />
 
       {isError && (
         <p className="mb-4 text-sm text-integra-error">Не удалось загрузить настройки</p>
@@ -106,54 +94,6 @@ export function SettingsPage() {
             <Button onClick={() => saveOrg.mutate()} loading={saveOrg.isPending}>
               Сохранить
             </Button>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Уведомления</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <label className="flex items-center justify-between gap-4 text-sm">
-              <span className="text-integra-gray-900">SMS-напоминания о записях</span>
-              <input
-                type="checkbox"
-                className="h-4 w-4 rounded border-integra-gray-200 text-primary"
-                checked={smsReminders}
-                onChange={(e) => setSmsReminders(e.target.checked)}
-              />
-            </label>
-            <label className="flex items-center justify-between gap-4 text-sm">
-              <span className="text-integra-gray-900">Email-уведомления</span>
-              <input
-                type="checkbox"
-                className="h-4 w-4 rounded border-integra-gray-200 text-primary"
-                checked={emailNotifications}
-                onChange={(e) => setEmailNotifications(e.target.checked)}
-              />
-            </label>
-            <label className="flex items-center justify-between gap-4 text-sm">
-              <span className="text-integra-gray-900">Push-уведомления</span>
-              <input
-                type="checkbox"
-                className="h-4 w-4 rounded border-integra-gray-200 text-primary"
-                checked={pushNotifications}
-                onChange={(e) => setPushNotifications(e.target.checked)}
-              />
-            </label>
-            <p className="text-xs text-integra-gray-600">
-              Сохраняются вместе с данными организации
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Интеграции</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm text-integra-gray-600">
-            <p>Google Drive — хранение медицинских документов</p>
-            <p>WhatsApp / Telegram — уведомления пациентам (скоро)</p>
           </CardContent>
         </Card>
 

@@ -15,16 +15,15 @@ export class StorageService {
   constructor(
     config: ConfigService,
     localAdapter: LocalStorageAdapter,
-    googleDriveAdapter: GoogleDriveAdapter,
+    _googleDriveAdapter: GoogleDriveAdapter,
   ) {
     const providerName = config.get<string>('storage.provider') ?? 'local';
+    // Drive is wired later. Never throw on upload if the env is flipped too early.
     if (providerName === 'google_drive') {
-      this.provider = googleDriveAdapter;
-      this.providerType = PrismaStorageProvider.GOOGLE_DRIVE;
-    } else {
-      this.provider = localAdapter;
-      this.providerType = PrismaStorageProvider.LOCAL;
+      console.warn('[INTEGRA] STORAGE_PROVIDER=google_drive is not live yet; using local+checksum');
     }
+    this.provider = localAdapter;
+    this.providerType = PrismaStorageProvider.LOCAL;
   }
 
   getProviderType(): PrismaStorageProvider {
