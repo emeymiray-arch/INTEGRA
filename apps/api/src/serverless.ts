@@ -54,7 +54,7 @@ async function bootstrap(): Promise<Express> {
   }
 }
 
-export default async function handler(req: Request, res: Response) {
+export default async function handler(req: Request, res: Response): Promise<void> {
   try {
     if (!process.env.DATABASE_URL) {
       res.status(503).json({
@@ -69,7 +69,17 @@ export default async function handler(req: Request, res: Response) {
     }
 
     const server = await bootstrap();
-    return server(req, res);
+    // Use handle() — calling the app as a function triggers Express 3-era app.router paths.
+    await new Promise<void>((resolve, reject) => {
+      try {
+        server.handle(req, res, (err?: unknown) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      } catch (err) {
+        reject(err);
+      }
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown serverless error';
     console.error('[INTEGRA] Function invocation failed:', message);

@@ -111,12 +111,8 @@ rm -rf "$FUNC/node_modules/@prisma/client/generator-build" \
 cat > "$OUT/functions/api.func/index.js" <<'EOF'
 'use strict';
 try {
-  require('reflect-metadata');
-} catch (_) {
-  /* bundled */
-}
-try {
-  module.exports = require('./handler.js');
+  const mod = require('./handler.js');
+  module.exports = typeof mod === 'function' ? mod : mod.default;
 } catch (error) {
   module.exports = async function failingHandler(_req, res) {
     const message = error instanceof Error ? error.stack || error.message : String(error);
@@ -143,7 +139,7 @@ cat > "$OUT/functions/api.func/.vc-config.json" <<'EOF'
   "runtime": "nodejs20.x",
   "handler": "index.js",
   "launcherType": "Nodejs",
-  "shouldAddHelpers": true,
+  "shouldAddHelpers": false,
   "maxDuration": 60,
   "supportsResponseStreaming": false
 }
