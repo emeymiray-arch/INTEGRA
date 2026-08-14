@@ -18,3 +18,6 @@ apps/*/dist
 packages/*/dist
 apps/api/public
 .pnpm-store
+.env*
+api/handler.js
+apps/api/api/handler.js

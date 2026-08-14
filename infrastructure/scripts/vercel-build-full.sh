@@ -170,12 +170,6 @@ mkdir -p "$ROOT/public" "$ROOT/apps/api/public"
 cp -R "$WEB_DIST"/. "$ROOT/public/"
 cp -R "$WEB_DIST"/. "$ROOT/apps/api/public/"
 
-mkdir -p "$ROOT/api" "$ROOT/apps/api/api"
-cp "$OUT/functions/api.func/index.js" "$ROOT/api/index.js"
-cp "$OUT/functions/api.func/handler.js" "$ROOT/api/handler.js"
-cp "$OUT/functions/api.func/index.js" "$ROOT/apps/api/api/index.js"
-cp "$OUT/functions/api.func/handler.js" "$ROOT/apps/api/api/handler.js"
-
 echo "[integra] Build Output API ready"
 du -sh "$OUT" "$OUT/functions/api.func" "$OUT/static"
 

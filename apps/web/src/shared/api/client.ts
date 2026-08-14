@@ -82,9 +82,11 @@ apiClient.interceptors.response.use(
     isRefreshing = true;
 
     try {
-      const { data: body } = await axios.post(`${API_BASE}/auth/refresh`, {
-        refreshToken,
-      });
+      const { data: body } = await axios.post(
+        `${API_BASE}/auth/refresh`,
+        { refreshToken },
+        { timeout: 8000 },
+      );
       const payload = (body?.data ?? body) as {
         accessToken: string;
         refreshToken: string;
