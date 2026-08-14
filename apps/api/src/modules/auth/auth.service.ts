@@ -263,7 +263,7 @@ export class AuthService {
     return { success: true };
   }
 
-  async me(userId: string): Promise<AuthUser> {
+  async me(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       include: {
@@ -285,13 +285,23 @@ export class AuthService {
 
     const roles = user.staff.staffRoles.map((sr) => sr.role.code as RoleCode);
     return {
-      userId: user.id,
-      staffId: user.staff.id,
+      user: {
+        id: user.id,
+        email: user.email,
+        isActive: user.isActive,
+      },
+      staff: {
+        id: user.staff.id,
+        firstName: user.staff.firstName,
+        lastName: user.staff.lastName,
+        middleName: user.staff.middleName ?? undefined,
+        avatarUrl: user.staff.avatarUrl ?? undefined,
+        specialization: user.staff.specialization ?? undefined,
+      },
+      permissions: getPermissionsForRoles(roles),
+      roles,
       organizationId: user.staff.organizationId,
       branchId: user.staff.branchId,
-      email: user.email,
-      roles,
-      permissions: getPermissionsForRoles(roles),
     };
   }
 

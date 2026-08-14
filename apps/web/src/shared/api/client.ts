@@ -26,7 +26,16 @@ apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 });
 
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    const body = response.data;
+    if (body && typeof body === 'object' && !Array.isArray(body)) {
+      const keys = Object.keys(body as object);
+      if (keys.includes('data') && keys.every((key) => key === 'data' || key === 'error')) {
+        response.data = (body as { data: unknown }).data;
+      }
+    }
+    return response;
+  },
   async (error: AxiosError) => {
     const original = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 

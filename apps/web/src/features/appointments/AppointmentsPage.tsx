@@ -31,7 +31,7 @@ export function AppointmentsPage() {
     },
   });
 
-  const appointments: Appointment[] = data?.data ?? [];
+  const appointments: Appointment[] = Array.isArray(data) ? data : (data?.data ?? []);
   const meta = data?.meta ?? { page: 1, totalPages: 1 };
 
   const columns: DataTableColumn<Appointment>[] = [

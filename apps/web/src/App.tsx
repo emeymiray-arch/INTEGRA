@@ -1,4 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { ErrorBoundary } from '@/app/ErrorBoundary';
 import { AppProviders } from '@/app/providers';
 import { AuthLayout } from '@/app/layouts/AuthLayout';
 import { AppLayout } from '@/app/layouts/AppLayout';
@@ -18,6 +19,7 @@ import { SettingsPage } from '@/features/settings/SettingsPage';
 export function App() {
   return (
     <AppProviders>
+      <ErrorBoundary>
       <BrowserRouter>
         <Routes>
           <Route element={<GuestRoute />}>
@@ -44,6 +46,7 @@ export function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
+      </ErrorBoundary>
     </AppProviders>
   );
 }

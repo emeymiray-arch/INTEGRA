@@ -24,6 +24,16 @@ import { formatDateTime, formatTime } from '@/shared/lib/format';
 import { appointmentBadgeVariant, appointmentStatusLabels } from '@/shared/lib/format';
 import { AppointmentStatus } from '@integra/shared';
 
+function asArray<T>(value: unknown): T[] {
+  if (Array.isArray(value)) return value as T[];
+  if (value && typeof value === 'object') {
+    const record = value as { data?: unknown; items?: unknown };
+    if (Array.isArray(record.items)) return record.items as T[];
+    if (Array.isArray(record.data)) return record.data as T[];
+  }
+  return [];
+}
+
 export function DashboardPage() {
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ['dashboard'],
@@ -37,20 +47,20 @@ export function DashboardPage() {
     queryKey: ['appointments', 'today'],
     queryFn: async () => {
       const today = new Date().toISOString().split('T')[0];
-      const { data } = await apiClient.get<{ data: Appointment[] }>('/appointments', {
+      const { data } = await apiClient.get('/appointments', {
         params: { date: today, limit: 10 },
       });
-      return data.data ?? data;
+      return asArray<Appointment>(data);
     },
   });
 
   const { data: activity = [] } = useQuery({
     queryKey: ['activity'],
     queryFn: async () => {
-      const { data } = await apiClient.get<{ data: ActivityItem[] }>('/activity', {
+      const { data } = await apiClient.get('/activity', {
         params: { limit: 8 },
       });
-      return data.data ?? data;
+      return asArray<ActivityItem>(data);
     },
   });
 
@@ -156,7 +166,8 @@ export function DashboardPage() {
                 id: item.id,
                 title: item.eventType.replace(/\./g, ' · '),
                 description: item.user
-                  ? `${item.user.lastName} ${item.user.firstName}`
+                  ? `${item.user.lastName ?? ''} ${item.user.firstName ?? ''}`.trim() ||
+                    undefined
                   : undefined,
                 date: formatDateTime(item.createdAt),
               }))}
