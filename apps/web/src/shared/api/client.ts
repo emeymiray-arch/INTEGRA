@@ -23,9 +23,13 @@ function flushQueue(error: unknown, token?: string) {
   refreshQueue = [];
 }
 
+function isPublicAuthRequest(url?: string) {
+  return /\/auth\/(login|register|refresh)\b/.test(url ?? '');
+}
+
 apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const token = useAuthStore.getState().accessToken;
-  if (token) {
+  if (token && !isPublicAuthRequest(config.url)) {
     config.headers.Authorization = `Bearer ${token}`;
   }
   if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
@@ -48,7 +52,11 @@ apiClient.interceptors.response.use(
   async (error: AxiosError) => {
     const original = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
-    if (error.response?.status !== 401 || original._retry) {
+    if (
+      error.response?.status !== 401 ||
+      original._retry ||
+      isPublicAuthRequest(original.url)
+    ) {
       return Promise.reject(error);
     }
 
@@ -83,6 +91,9 @@ apiClient.interceptors.response.use(
       };
       const newAccess = payload.accessToken;
       const newRefresh = payload.refreshToken;
+      if (!newAccess || !newRefresh) {
+        throw new Error('Refresh payload missing tokens');
+      }
       setTokens(newAccess, newRefresh);
       flushQueue(null, newAccess);
       original.headers.Authorization = `Bearer ${newAccess}`;

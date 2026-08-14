@@ -28,10 +28,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const finish = () => useAuthStore.setState({ hasHydrated: true });
     const persistApi = useAuthStore.persist;
     if (persistApi.hasHydrated()) finish();
-    return persistApi.onFinishHydration(finish);
+    const unsub = persistApi.onFinishHydration(finish);
+    const timeout = window.setTimeout(finish, 800);
+    return () => {
+      if (typeof unsub === 'function') unsub();
+      window.clearTimeout(timeout);
+    };
   }, []);
 
-  const { isLoading, isFetching } = useQuery({
+  const { isLoading, isFetching, isError } = useQuery({
     queryKey: ['auth', 'me'],
     queryFn: async () => {
       const res = await apiClient.get('/auth/me');
@@ -63,7 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!accessToken) logout();
   }, [isAuthenticated, accessToken, logout]);
 
-  const blocking = isAuthenticated && !user && (isLoading || isFetching);
+  const blocking = isAuthenticated && !user && (isLoading || isFetching) && !isError;
 
   return (
     <AuthContext.Provider value={{ isLoading: blocking, isAuthenticated }}>
