@@ -45,7 +45,7 @@ export const useAuthStore = create<AuthState>()(
       staff: null,
       permissions: [],
       isAuthenticated: false,
-      hasHydrated: false,
+      hasHydrated: true,
       setAuth: ({ accessToken, refreshToken, user, staff, permissions }) =>
         set({
           accessToken,
