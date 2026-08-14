@@ -175,6 +175,15 @@ export interface StaffMember {
   roles?: Array<{ code: string; name: string }>;
 }
 
+export interface Debt {
+  id: string;
+  debtorName: string;
+  amount: number;
+  note?: string | null;
+  settledAt?: string | null;
+  createdAt: string;
+}
+
 export interface Invoice {
   id: string;
   number: string;

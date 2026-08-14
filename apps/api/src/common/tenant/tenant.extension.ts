@@ -11,6 +11,7 @@ const TENANT_MODELS = new Set([
   'Service',
   'Appointment',
   'Invoice',
+  'Debt',
   'PaymentMethod',
   'Payment',
   'Refund',

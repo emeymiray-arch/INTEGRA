@@ -275,4 +275,73 @@ export class FinanceService {
       },
     });
   }
+
+  async findDebts(organizationId: string, includeSettled = false) {
+    const where = {
+      organizationId,
+      ...(includeSettled ? {} : { settledAt: null }),
+    };
+    const [items, countOpen, openSum] = await Promise.all([
+      this.prisma.debt.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: 200,
+      }),
+      this.prisma.debt.count({
+        where: { organizationId, settledAt: null },
+      }),
+      this.prisma.debt.aggregate({
+        where: { organizationId, settledAt: null },
+        _sum: { amount: true },
+      }),
+    ]);
+    return {
+      items: items.map((row) => ({ ...row, amount: Number(row.amount) })),
+      totalOpen: Number(openSum._sum.amount ?? 0),
+      countOpen,
+    };
+  }
+
+  createDebt(
+    organizationId: string,
+    userId: string,
+    data: { debtorName: string; amount: number; note?: string },
+  ) {
+    const debtorName = data.debtorName.trim();
+    if (!debtorName) throw new BadRequestException('Укажите должника');
+    if (!Number.isFinite(data.amount) || data.amount < 0.01) {
+      throw new BadRequestException('Некорректная сумма');
+    }
+
+    return this.prisma.debt.create({
+      data: {
+        organizationId,
+        debtorName,
+        amount: data.amount,
+        note: data.note?.trim() || null,
+        createdBy: userId,
+      },
+    });
+  }
+
+  async settleDebt(organizationId: string, id: string) {
+    const existing = await this.prisma.debt.findFirst({
+      where: { id, organizationId, settledAt: null },
+    });
+    if (!existing) throw new NotFoundException('Долг не найден');
+    await this.prisma.debt.updateMany({
+      where: { id, organizationId, settledAt: null },
+      data: { settledAt: new Date() },
+    });
+    return this.prisma.debt.findFirstOrThrow({ where: { id, organizationId } });
+  }
+
+  async removeDebt(organizationId: string, id: string) {
+    const existing = await this.prisma.debt.findFirst({
+      where: { id, organizationId },
+    });
+    if (!existing) throw new NotFoundException('Долг не найден');
+    await this.prisma.debt.deleteMany({ where: { id, organizationId } });
+    return { success: true };
+  }
 }

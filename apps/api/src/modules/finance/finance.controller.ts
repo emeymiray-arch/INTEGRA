@@ -1,8 +1,10 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -13,7 +15,9 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  MaxLength,
   Min,
+  MinLength,
 } from 'class-validator';
 import { DiscountType } from '@prisma/client';
 import { clampLimit, clampPage, PERMISSIONS } from '@integra/shared';
@@ -50,12 +54,62 @@ class InvoiceItemDto {
   discountValue?: number;
 }
 
+class CreateDebtDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(200)
+  debtorName!: string;
+
+  @IsNumber()
+  @Min(0.01)
+  amount!: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  note?: string;
+}
+
 @ApiTags('finance')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('finance')
 export class FinanceController {
   constructor(private readonly financeService: FinanceService) {}
+
+  @Get('debts')
+  @RequirePermissions(PERMISSIONS.FINANCE_READ)
+  findDebts(
+    @CurrentUser() user: AuthUser,
+    @Query('includeSettled') includeSettled?: string,
+  ) {
+    return this.financeService.findDebts(
+      user.organizationId,
+      String(includeSettled) === 'true',
+    );
+  }
+
+  @Post('debts')
+  @RequirePermissions(PERMISSIONS.FINANCE_WRITE)
+  createDebt(@CurrentUser() user: AuthUser, @Body() dto: CreateDebtDto) {
+    return this.financeService.createDebt(user.organizationId, user.userId, {
+      debtorName: dto.debtorName,
+      amount: Number(dto.amount),
+      note: dto.note,
+    });
+  }
+
+  @Patch('debts/:id/settle')
+  @RequirePermissions(PERMISSIONS.FINANCE_WRITE)
+  settleDebt(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.financeService.settleDebt(user.organizationId, id);
+  }
+
+  @Delete('debts/:id')
+  @RequirePermissions(PERMISSIONS.FINANCE_WRITE)
+  removeDebt(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.financeService.removeDebt(user.organizationId, id);
+  }
 
   @Get('invoices')
   @RequirePermissions(PERMISSIONS.FINANCE_READ)
