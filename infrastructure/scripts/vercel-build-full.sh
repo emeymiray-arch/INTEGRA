@@ -39,7 +39,6 @@ npx --yes esbuild@0.25.0 "$API_HANDLER" \
   --outfile="$API_BUNDLE" \
   --external:@prisma/client \
   --external:.prisma/client \
-  --external:pg \
   --external:pg-native \
   --external:@nestjs/microservices \
   --external:@nestjs/microservices/microservices-module \
@@ -56,7 +55,6 @@ resolve_pkg_dir() {
 }
 
 PRISMA_CLIENT_DIR="$(resolve_pkg_dir @prisma/client)"
-PG_DIR="$(resolve_pkg_dir pg)"
 PRISMA_DOT_DIR="$(
   cd "$ROOT/apps/api"
   node <<'NODE'
@@ -79,7 +77,6 @@ NODE
 )"
 
 echo "[integra] prisma client: $PRISMA_CLIENT_DIR"
-echo "[integra] pg: $PG_DIR"
 echo "[integra] prisma engine dir: ${PRISMA_DOT_DIR:-none}"
 
 OUT="$ROOT/.vercel/output"
@@ -91,14 +88,6 @@ mkdir -p "$OUT/functions/api.func/node_modules/.prisma"
 cp -R "$WEB_DIST"/. "$OUT/static/"
 cp "$API_BUNDLE" "$OUT/functions/api.func/handler.js"
 cp -R "$PRISMA_CLIENT_DIR" "$OUT/functions/api.func/node_modules/@prisma/client"
-cp -R "$PG_DIR" "$OUT/functions/api.func/node_modules/pg"
-
-for dep in pg-types pg-protocol pg-cloudflare pgpass postgres-array postgres-bytea postgres-date postgres-interval pg-connection-string pg-int8 pg-pool; do
-  if dep_dir="$(resolve_pkg_dir "$dep" 2>/dev/null)"; then
-    mkdir -p "$OUT/functions/api.func/node_modules"
-    cp -R "$dep_dir" "$OUT/functions/api.func/node_modules/$dep" 2>/dev/null || true
-  fi
-done
 
 if [ -n "${PRISMA_DOT_DIR:-}" ] && [ -d "$PRISMA_DOT_DIR" ]; then
   cp -R "$PRISMA_DOT_DIR" "$OUT/functions/api.func/node_modules/.prisma/client"
