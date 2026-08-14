@@ -158,7 +158,7 @@ cat > "$OUT/config.json" <<'EOF'
 {
   "version": 3,
   "routes": [
-    { "src": "/api(?:/.*)?$", "dest": "/api" },
+    { "src": "/api(?:/(.*))?$", "dest": "/api" },
     { "handle": "filesystem" },
     { "src": "/(.*)", "dest": "/index.html" }
   ]

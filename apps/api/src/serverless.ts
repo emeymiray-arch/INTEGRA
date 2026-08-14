@@ -3,27 +3,35 @@ import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { ExpressAdapter } from '@nestjs/platform-express';
-import express, { type Application, type Request, type Response } from 'express';
-import serverlessHttp from 'serverless-http';
+import express, { type Application, type NextFunction, type Request, type Response } from 'express';
 import { AppModule } from './app.module';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 
-let cachedExpress: Application | undefined;
-let cachedHandler: ((req: Request, res: Response) => unknown) | undefined;
+let cachedApp: Application | undefined;
 let bootstrapError: Error | undefined;
 
 async function bootstrap(): Promise<Application> {
-  if (bootstrapError) {
-    throw bootstrapError;
-  }
-  if (cachedExpress) {
-    return cachedExpress;
-  }
+  if (bootstrapError) throw bootstrapError;
+  if (cachedApp) return cachedApp;
 
   try {
     const expressApp = express();
+    // Ensure JSON body works on Vercel Node (req/res) without relying on platform helpers.
+    expressApp.use(express.json({ limit: '2mb' }));
+    expressApp.use(express.urlencoded({ extended: true }));
+
+    // Lightweight probe that does not need Nest bootstrap completion diagnostics.
+    expressApp.get('/api/health', (_req, res) => {
+      res.status(200).json({
+        ok: true,
+        hasDbUrl: Boolean(process.env.DATABASE_URL),
+        node: process.version,
+      });
+    });
+
     const app = await NestFactory.create(AppModule, new ExpressAdapter(expressApp), {
       logger: ['error', 'warn', 'log'],
+      bodyParser: false,
     });
 
     const config = app.get(ConfigService);
@@ -47,7 +55,7 @@ async function bootstrap(): Promise<Application> {
     app.useGlobalInterceptors(new TransformInterceptor());
 
     await app.init();
-    cachedExpress = expressApp;
+    cachedApp = expressApp;
     return expressApp;
   } catch (error) {
     bootstrapError = error instanceof Error ? error : new Error(String(error));
@@ -56,43 +64,71 @@ async function bootstrap(): Promise<Application> {
   }
 }
 
-async function getHandler() {
-  if (cachedHandler) {
-    return cachedHandler;
-  }
-  const expressApp = await bootstrap();
-  // serverless-http adapts Express for Lambda/Vercel without touching deprecated app.router
-  cachedHandler = serverlessHttp(expressApp) as (req: Request, res: Response) => unknown;
-  return cachedHandler;
+function runExpress(app: Application, req: Request, res: Response): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    let settled = false;
+    const finish = (err?: unknown) => {
+      if (settled) return;
+      settled = true;
+      if (err) reject(err instanceof Error ? err : new Error(String(err)));
+      else resolve();
+    };
+
+    res.once('finish', () => finish());
+    res.once('close', () => finish());
+
+    try {
+      // Call as Node request listener. Never export the Express app itself to Vercel
+      // (that triggers the deprecated app.router path in platform helpers).
+      const listener = app as unknown as (
+        req: Request,
+        res: Response,
+        next: NextFunction,
+      ) => void;
+      listener(req, res, (err?: unknown) => finish(err));
+    } catch (err) {
+      finish(err);
+    }
+  });
 }
 
 export default async function handler(req: Request, res: Response): Promise<void> {
   try {
     if (!process.env.DATABASE_URL) {
-      res.status(503).json({
-        data: null,
-        error: {
-          code: 'DATABASE_URL_MISSING',
-          message:
-            'DATABASE_URL не задан. Добавьте PostgreSQL (Neon) и переменную DATABASE_URL в настройках Vercel.',
-        },
-      });
+      res.statusCode = 503;
+      res.setHeader('Content-Type', 'application/json');
+      res.end(
+        JSON.stringify({
+          data: null,
+          error: {
+            code: 'DATABASE_URL_MISSING',
+            message:
+              'DATABASE_URL не задан. Добавьте Neon DATABASE_URL в Environment Variables проекта Vercel (Production).',
+          },
+        }),
+      );
       return;
     }
 
-    const run = await getHandler();
-    await run(req, res);
+    const app = await bootstrap();
+    await runExpress(app, req, res);
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown serverless error';
+    const message = error instanceof Error ? error.stack || error.message : String(error);
     console.error('[INTEGRA] Function invocation failed:', message);
     if (!res.headersSent) {
-      res.status(500).json({
-        data: null,
-        error: {
-          code: 'FUNCTION_INVOCATION_FAILED',
-          message,
-        },
-      });
+      res.statusCode = 500;
+      res.setHeader('Content-Type', 'application/json');
+      res.end(
+        JSON.stringify({
+          data: null,
+          error: {
+            code: 'FUNCTION_INVOCATION_FAILED',
+            message,
+            url: req.url,
+            method: req.method,
+          },
+        }),
+      );
     }
   }
 }

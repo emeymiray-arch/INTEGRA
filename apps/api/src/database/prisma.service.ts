@@ -15,7 +15,12 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       return;
     }
 
-    const pool = new Pool({ connectionString });
+    // Serverless: one connection per isolate; Neon needs TLS.
+    const pool = new Pool({
+      connectionString,
+      max: 1,
+      ssl: connectionString.includes('localhost') ? undefined : { rejectUnauthorized: false },
+    });
     super({ adapter: new PrismaPg(pool) });
     this.pool = pool;
   }
