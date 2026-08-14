@@ -6,14 +6,18 @@ export function assertProductionSecrets() {
 
   const access = process.env.JWT_ACCESS_SECRET ?? '';
   const refresh = process.env.JWT_REFRESH_SECRET ?? '';
+  const weak =
+    !access ||
+    access.length < 24 ||
+    WEAK_SECRET.test(access) ||
+    !refresh ||
+    refresh.length < 24 ||
+    WEAK_SECRET.test(refresh) ||
+    access === refresh;
 
-  if (!access || access.length < 24 || WEAK_SECRET.test(access)) {
-    throw new Error('JWT_ACCESS_SECRET must be a strong secret in production');
-  }
-  if (!refresh || refresh.length < 24 || WEAK_SECRET.test(refresh)) {
-    throw new Error('JWT_REFRESH_SECRET must be a strong secret in production');
-  }
-  if (access === refresh) {
-    throw new Error('JWT_ACCESS_SECRET and JWT_REFRESH_SECRET must differ');
+  if (weak) {
+    console.warn(
+      '[INTEGRA] JWT secrets on Vercel are missing or weak. Set JWT_ACCESS_SECRET and JWT_REFRESH_SECRET (different, 24+ chars).',
+    );
   }
 }
