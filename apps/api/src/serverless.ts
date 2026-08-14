@@ -4,18 +4,20 @@ import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { ExpressAdapter } from '@nestjs/platform-express';
 import express, { type Application, type Request, type Response } from 'express';
+import serverlessHttp from 'serverless-http';
 import { AppModule } from './app.module';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 
-let cachedServer: Application | undefined;
+let cachedExpress: Application | undefined;
+let cachedHandler: ((req: Request, res: Response) => unknown) | undefined;
 let bootstrapError: Error | undefined;
 
 async function bootstrap(): Promise<Application> {
   if (bootstrapError) {
     throw bootstrapError;
   }
-  if (cachedServer) {
-    return cachedServer;
+  if (cachedExpress) {
+    return cachedExpress;
   }
 
   try {
@@ -45,13 +47,23 @@ async function bootstrap(): Promise<Application> {
     app.useGlobalInterceptors(new TransformInterceptor());
 
     await app.init();
-    cachedServer = expressApp;
+    cachedExpress = expressApp;
     return expressApp;
   } catch (error) {
     bootstrapError = error instanceof Error ? error : new Error(String(error));
     console.error('[INTEGRA] Nest bootstrap failed:', bootstrapError);
     throw bootstrapError;
   }
+}
+
+async function getHandler() {
+  if (cachedHandler) {
+    return cachedHandler;
+  }
+  const expressApp = await bootstrap();
+  // serverless-http adapts Express for Lambda/Vercel without touching deprecated app.router
+  cachedHandler = serverlessHttp(expressApp) as (req: Request, res: Response) => unknown;
+  return cachedHandler;
 }
 
 export default async function handler(req: Request, res: Response): Promise<void> {
@@ -68,20 +80,8 @@ export default async function handler(req: Request, res: Response): Promise<void
       return;
     }
 
-    const server = await bootstrap();
-    await new Promise<void>((resolve, reject) => {
-      try {
-        // Express Application.handle exists at runtime; typings omit the overload we need.
-        (server as unknown as {
-          handle: (req: Request, res: Response, cb?: (err?: unknown) => void) => void;
-        }).handle(req, res, (err?: unknown) => {
-          if (err) reject(err);
-          else resolve();
-        });
-      } catch (err) {
-        reject(err);
-      }
-    });
+    const run = await getHandler();
+    await run(req, res);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown serverless error';
     console.error('[INTEGRA] Function invocation failed:', message);

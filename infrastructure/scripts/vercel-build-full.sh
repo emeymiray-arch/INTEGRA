@@ -148,7 +148,7 @@ cat > "$OUT/functions/api.func/.vc-config.json" <<'EOF'
   "runtime": "nodejs20.x",
   "handler": "index.js",
   "launcherType": "Nodejs",
-  "shouldAddHelpers": true,
+  "shouldAddHelpers": false,
   "maxDuration": 60,
   "supportsResponseStreaming": false
 }
