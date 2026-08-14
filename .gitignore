@@ -5,6 +5,9 @@ public
 .turbo
 .env
 .env.local
+infrastructure/timeweb.env
+infrastructure/DATABASE_URL.timeweb.txt
+infrastructure/integra-neon.dump.sql
 *.log
 .DS_Store
 uploads

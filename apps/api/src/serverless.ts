@@ -130,7 +130,7 @@ export default async function handler(req: Request, res: Response): Promise<void
           error: {
             code: 'DATABASE_URL_MISSING',
             message:
-              'DATABASE_URL не задан. Добавьте Neon DATABASE_URL в Environment Variables проекта Vercel (Production).',
+              'DATABASE_URL не задан. Добавьте строку PostgreSQL в Environment Variables проекта Vercel (Production).',
           },
         }),
       );

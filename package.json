@@ -10,7 +10,8 @@
     "db:migrate": "pnpm --filter @integra/api db:migrate",
     "db:push": "pnpm --filter @integra/api db:push",
     "db:seed": "pnpm --filter @integra/api db:seed",
-    "db:studio": "pnpm --filter @integra/api db:studio"
+    "db:studio": "pnpm --filter @integra/api db:studio",
+    "db:timeweb": "node infrastructure/scripts/timeweb-setup.mjs"
   },
   "devDependencies": {
     "turbo": "^2.5.4",
