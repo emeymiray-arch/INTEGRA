@@ -37,19 +37,12 @@ export function RegisterPage() {
     defaultValues: {
       email: '',
       password: '',
-      confirmPassword: '',
-      firstName: '',
-      lastName: '',
-      middleName: '',
-      phone: '',
-      organizationName: '',
     },
   });
 
   const registerMutation = useMutation({
     mutationFn: async (data: RegisterInput) => {
-      const { confirmPassword: _confirm, ...payload } = data;
-      const res = await apiClient.post('/auth/register', payload);
+      const res = await apiClient.post('/auth/register', data);
       return unwrapData<AuthResponse>(res.data);
     },
     onSuccess: (data) => {
@@ -121,48 +114,12 @@ export function RegisterPage() {
       </div>
 
       <h2 className="text-2xl font-bold text-integra-gray-900">Регистрация</h2>
-      <p className="mt-1 text-sm text-integra-gray-600">
-        Создайте медицинский центр и аккаунт администратора
-      </p>
+      <p className="mt-1 text-sm text-integra-gray-600">Email и пароль — этого достаточно</p>
 
       <form
         className="mt-6 space-y-3"
         onSubmit={handleSubmit((data) => registerMutation.mutate(data))}
       >
-        <Input
-          label="Название центра"
-          placeholder="INTEGRA"
-          error={errors.organizationName?.message}
-          {...register('organizationName')}
-        />
-
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Input
-            label="Фамилия"
-            error={errors.lastName?.message}
-            {...register('lastName')}
-          />
-          <Input
-            label="Имя"
-            error={errors.firstName?.message}
-            {...register('firstName')}
-          />
-        </div>
-
-        <Input
-          label="Отчество"
-          error={errors.middleName?.message}
-          {...register('middleName')}
-        />
-
-        <Input
-          label="Телефон"
-          type="tel"
-          autoComplete="tel"
-          error={errors.phone?.message}
-          {...register('phone')}
-        />
-
         <Input
           label="Email"
           type="email"
@@ -177,14 +134,6 @@ export function RegisterPage() {
           autoComplete="new-password"
           error={errors.password?.message}
           {...register('password')}
-        />
-
-        <Input
-          label="Повторите пароль"
-          type="password"
-          autoComplete="new-password"
-          error={errors.confirmPassword?.message}
-          {...register('confirmPassword')}
         />
 
         {registerMutation.isError && (

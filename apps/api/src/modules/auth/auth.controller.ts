@@ -23,26 +23,6 @@ class RegisterDto {
   @IsString()
   @MinLength(6)
   password!: string;
-
-  @IsString()
-  @MinLength(1)
-  firstName!: string;
-
-  @IsString()
-  @MinLength(1)
-  lastName!: string;
-
-  @IsOptional()
-  @IsString()
-  middleName?: string;
-
-  @IsOptional()
-  @IsString()
-  phone?: string;
-
-  @IsString()
-  @MinLength(2)
-  organizationName!: string;
 }
 
 class RefreshDto {
@@ -67,11 +47,6 @@ export class AuthController {
       {
         email: dto.email,
         password: dto.password,
-        firstName: dto.firstName,
-        lastName: dto.lastName,
-        middleName: dto.middleName,
-        phone: dto.phone,
-        organizationName: dto.organizationName,
       },
       req.headers['user-agent'],
       req.ip,

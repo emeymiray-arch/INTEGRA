@@ -3,14 +3,14 @@ import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { ExpressAdapter } from '@nestjs/platform-express';
-import express, { Express, Request, Response } from 'express';
+import express, { type Application, type Request, type Response } from 'express';
 import { AppModule } from './app.module';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 
-let cachedServer: Express | undefined;
+let cachedServer: Application | undefined;
 let bootstrapError: Error | undefined;
 
-async function bootstrap(): Promise<Express> {
+async function bootstrap(): Promise<Application> {
   if (bootstrapError) {
     throw bootstrapError;
   }
@@ -69,7 +69,6 @@ export default async function handler(req: Request, res: Response): Promise<void
     }
 
     const server = await bootstrap();
-    // Use handle() — calling the app as a function triggers Express 3-era app.router paths.
     await new Promise<void>((resolve, reject) => {
       try {
         server.handle(req, res, (err?: unknown) => {

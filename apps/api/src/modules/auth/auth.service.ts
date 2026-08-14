@@ -22,11 +22,6 @@ import { AuthUser, JwtPayload } from '../../common/types/auth-user.interface';
 export interface RegisterInput {
   email: string;
   password: string;
-  firstName: string;
-  lastName: string;
-  middleName?: string;
-  phone?: string;
-  organizationName: string;
 }
 
 @Injectable()
@@ -45,12 +40,14 @@ export class AuthService {
       throw new ConflictException('Пользователь с таким email уже зарегистрирован');
     }
 
-    const slug = this.slugify(input.organizationName);
-    const existingOrg = await this.prisma.organization.findUnique({ where: { slug } });
-    if (existingOrg) {
-      throw new ConflictException(
-        'Организация с таким названием уже существует. Войдите или выберите другое название.',
-      );
+    const localPart = email.split('@')[0] || 'clinic';
+    const organizationName = `Клиника ${localPart}`;
+    const slugBase = this.slugify(organizationName);
+    let slug = slugBase;
+    let suffix = 0;
+    while (await this.prisma.organization.findUnique({ where: { slug } })) {
+      suffix += 1;
+      slug = `${slugBase}-${suffix}`;
     }
 
     await this.ensureSystemRoles();
@@ -63,7 +60,7 @@ export class AuthService {
     const result = await this.prisma.$transaction(async (tx) => {
       const organization = await tx.organization.create({
         data: {
-          name: input.organizationName.trim(),
+          name: organizationName,
           slug,
           settings: {
             locale: 'ru-RU',
@@ -93,10 +90,8 @@ export class AuthService {
           userId: user.id,
           organizationId: organization.id,
           branchId: branch.id,
-          firstName: input.firstName.trim(),
-          lastName: input.lastName.trim(),
-          middleName: input.middleName?.trim() || null,
-          phone: input.phone?.trim() || null,
+          firstName: 'Администратор',
+          lastName: localPart,
         },
       });
 
