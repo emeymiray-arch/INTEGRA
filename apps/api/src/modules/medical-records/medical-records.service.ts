@@ -169,8 +169,8 @@ export class MedicalRecordsService {
     },
   ) {
     await this.ensureVisit(organizationId, visitId);
-    return this.prisma.visit.update({
-      where: { id: visitId },
+    await this.prisma.visit.updateMany({
+      where: { id: visitId, organizationId },
       data: {
         ...(data.chiefComplaint !== undefined ? { chiefComplaint: data.chiefComplaint } : {}),
         ...(data.anamnesis !== undefined ? { anamnesis: data.anamnesis } : {}),
@@ -178,6 +178,9 @@ export class MedicalRecordsService {
         ...(data.prescriptions !== undefined ? { prescriptions: data.prescriptions } : {}),
         ...(data.status !== undefined ? { status: data.status } : {}),
       },
+    });
+    return this.prisma.visit.findFirstOrThrow({
+      where: { id: visitId, organizationId },
       include: { diagnoses: true, recommendations: true, measurements: true },
     });
   }
@@ -185,7 +188,7 @@ export class MedicalRecordsService {
   async deleteVisit(organizationId: string, visitId: string) {
     await this.ensureVisit(organizationId, visitId);
     await this.prisma.attachment.deleteMany({ where: { visitId } });
-    await this.prisma.visit.delete({ where: { id: visitId } });
+    await this.prisma.visit.deleteMany({ where: { id: visitId, organizationId } });
     return { success: true };
   }
 
@@ -275,7 +278,11 @@ export class MedicalRecordsService {
       where: { id: planId, organizationId },
     });
     if (!plan) throw new NotFoundException('Treatment plan not found');
-    return this.prisma.treatmentPlan.update({ where: { id: planId }, data });
+    await this.prisma.treatmentPlan.updateMany({
+      where: { id: planId, organizationId },
+      data: data as Prisma.TreatmentPlanUpdateManyMutationInput,
+    });
+    return this.prisma.treatmentPlan.findFirstOrThrow({ where: { id: planId, organizationId } });
   }
 
   private async ensureVisit(organizationId: string, visitId: string) {

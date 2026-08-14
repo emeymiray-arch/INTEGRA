@@ -2,6 +2,7 @@ import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
 import { Pool } from 'pg';
+import { tenantQueryExtension } from '../common/tenant/tenant.extension';
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
@@ -15,7 +16,6 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       return;
     }
 
-    // Serverless: one connection per isolate; Neon needs TLS.
     const pool = new Pool({
       connectionString,
       max: 1,
@@ -23,6 +23,18 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     });
     super({ adapter: new PrismaPg(pool) });
     this.pool = pool;
+
+    const extended = this.$extends(tenantQueryExtension as never);
+    return new Proxy(this, {
+      get: (target, prop, receiver) => {
+        if (prop === 'onModuleInit' || prop === 'onModuleDestroy' || prop === 'pool') {
+          return Reflect.get(target, prop, receiver);
+        }
+        const fromExtended = Reflect.get(extended as object, prop, extended);
+        if (fromExtended !== undefined) return fromExtended;
+        return Reflect.get(target, prop, receiver);
+      },
+    }) as this;
   }
 
   async onModuleInit() {

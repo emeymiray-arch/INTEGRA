@@ -28,12 +28,11 @@ export class StubNotificationProvider implements NotificationProvider {
         channel: input.channel,
         templateCode: input.templateCode,
         payload: (input.payload ?? {}) as Prisma.InputJsonValue,
-        status: NotificationStatus.SENT,
-        sentAt: new Date(),
+        status: NotificationStatus.PENDING,
       },
     });
 
-    return { success: true, logId: log.id };
+    return { success: true, queued: true, logId: log.id };
   }
 }
 

@@ -125,10 +125,13 @@ export class FinanceService {
       throw new BadRequestException('Only draft invoices can be issued');
     }
 
-    const updated = await this.prisma.invoice.update({
-      where: { id },
+    const updated = await this.prisma.invoice.updateMany({
+      where: { id, organizationId, status: InvoiceStatus.DRAFT },
       data: { status: InvoiceStatus.ISSUED, issuedAt: new Date() },
     });
+    if (!updated.count) {
+      throw new BadRequestException('Only draft invoices can be issued');
+    }
 
     await this.activity.log({
       organizationId,
@@ -138,7 +141,7 @@ export class FinanceService {
       entityId: id,
     });
 
-    return updated;
+    return this.findInvoice(organizationId, id);
   }
 
   async createPayment(

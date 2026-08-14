@@ -48,6 +48,19 @@ export function AppointmentsPage() {
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
       queryClient.invalidateQueries({ queryKey: ['schedule'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+    },
+  });
+
+  const complete = useMutation({
+    mutationFn: async (id: string) => {
+      await apiClient.patch(`/appointments/${id}/status`, { status: 'COMPLETED' });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
+      queryClient.invalidateQueries({ queryKey: ['schedule'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
     },
   });
 
@@ -88,6 +101,19 @@ export function AppointmentsPage() {
           {canWriteAppointments &&
             row.status !== 'CANCELLED' &&
             row.status !== 'COMPLETED' && (
+            <>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (window.confirm('Отметить визит выполненным? Будет выставлен счёт.')) {
+                  complete.mutate(row.id);
+                }
+              }}
+            >
+              Завершить
+            </Button>
             <Button
               variant="ghost"
               size="sm"
@@ -98,6 +124,7 @@ export function AppointmentsPage() {
             >
               Отменить
             </Button>
+            </>
           )}
         </div>
       ),
@@ -125,6 +152,11 @@ export function AppointmentsPage() {
       {cancel.isError && (
         <p className="mb-4 text-sm text-integra-error">
           {apiErrorMessage(cancel.error, 'Не удалось отменить запись')}
+        </p>
+      )}
+      {complete.isError && (
+        <p className="mb-4 text-sm text-integra-error">
+          {apiErrorMessage(complete.error, 'Не удалось завершить запись')}
         </p>
       )}
 

@@ -34,7 +34,11 @@ export class ServicesCatalogService {
     data: Prisma.ServiceCategoryUpdateInput,
   ) {
     await this.ensureCategory(organizationId, id);
-    return this.prisma.serviceCategory.update({ where: { id }, data });
+    await this.prisma.serviceCategory.updateMany({
+      where: { id, organizationId },
+      data: data as Prisma.ServiceCategoryUpdateManyMutationInput,
+    });
+    return this.prisma.serviceCategory.findFirstOrThrow({ where: { id, organizationId } });
   }
 
   findServices(organizationId: string, categoryId?: string) {
@@ -99,7 +103,11 @@ export class ServicesCatalogService {
     data: Prisma.ServiceUpdateInput,
   ) {
     await this.findService(organizationId, id);
-    const service = await this.prisma.service.update({ where: { id }, data });
+    await this.prisma.service.updateMany({
+      where: { id, organizationId },
+      data: data as Prisma.ServiceUpdateManyMutationInput,
+    });
+    const service = await this.findService(organizationId, id);
 
     await this.activity.log({
       organizationId,
@@ -114,10 +122,11 @@ export class ServicesCatalogService {
 
   async removeService(organizationId: string, id: string) {
     await this.findService(organizationId, id);
-    return this.prisma.service.update({
-      where: { id },
+    await this.prisma.service.updateMany({
+      where: { id, organizationId },
       data: { isActive: false },
     });
+    return this.findService(organizationId, id);
   }
 
   private async ensureCategory(organizationId: string, id: string) {

@@ -190,10 +190,11 @@ export class PatientsService {
       updateData.birthDate = new Date(updateData.birthDate);
     }
 
-    const updated = await this.prisma.patient.update({
-      where: { id },
-      data: updateData,
+    const updated = await this.prisma.patient.updateMany({
+      where: { id, organizationId, deletedAt: null },
+      data: updateData as Prisma.PatientUpdateManyMutationInput,
     });
+    if (!updated.count) throw new NotFoundException('Patient not found');
 
     await this.audit.logFieldChanges({
       organizationId,
@@ -201,7 +202,7 @@ export class PatientsService {
       entityType: 'Patient',
       entityId: id,
       oldData: existing as unknown as Record<string, unknown>,
-      newData: updated as unknown as Record<string, unknown>,
+      newData: { ...existing, ...updateData } as unknown as Record<string, unknown>,
       fields: [...AUDITABLE_FIELDS],
       ipAddress,
     });
@@ -220,8 +221,8 @@ export class PatientsService {
 
   async remove(organizationId: string, id: string, userId: string) {
     await this.findOne(organizationId, id);
-    await this.prisma.patient.update({
-      where: { id },
+    await this.prisma.patient.updateMany({
+      where: { id, organizationId, deletedAt: null },
       data: { deletedAt: new Date(), status: PatientStatus.ARCHIVED },
     });
 

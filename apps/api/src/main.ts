@@ -4,8 +4,10 @@ import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
+import { assertProductionSecrets } from './config/assert-config';
 
 async function bootstrap() {
+  assertProductionSecrets();
   const app = await NestFactory.create(AppModule);
   const config = app.get(ConfigService);
 

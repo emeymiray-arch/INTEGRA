@@ -6,6 +6,7 @@ import { ExpressAdapter } from '@nestjs/platform-express';
 import express, { type Application, type NextFunction, type Request, type Response } from 'express';
 import { AppModule } from './app.module';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
+import { assertProductionSecrets } from './config/assert-config';
 
 let cachedApp: Application | undefined;
 let bootstrapError: Error | undefined;
@@ -15,6 +16,7 @@ async function bootstrap(): Promise<Application> {
   if (cachedApp) return cachedApp;
 
   try {
+    assertProductionSecrets();
     const expressApp = express();
     // Ensure JSON body works on Vercel Node (req/res) without relying on platform helpers.
     expressApp.use(express.json({ limit: '2mb' }));

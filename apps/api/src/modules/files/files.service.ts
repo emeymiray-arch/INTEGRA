@@ -24,25 +24,13 @@ export class FilesService {
       take: 12,
     });
 
-    return Promise.all(
-      files.map(async (file) => {
-        let previewUrl = file.checksum?.startsWith('data:') ? file.checksum : undefined;
-        if (!previewUrl && file.mimeType.startsWith('image/')) {
-          const buffer = await this.storage.readLocal(file.storageKey);
-          if (buffer) {
-            previewUrl = `data:${file.mimeType};base64,${buffer.toString('base64')}`;
-          }
-        }
-        return {
-          id: file.id,
-          filename: file.filename,
-          mimeType: file.mimeType,
-          size: file.size.toString(),
-          createdAt: file.createdAt,
-          previewUrl,
-        };
-      }),
-    );
+    return files.map((file) => ({
+      id: file.id,
+      filename: file.filename,
+      mimeType: file.mimeType,
+      size: file.size.toString(),
+      createdAt: file.createdAt,
+    }));
   }
 
   async upload(
@@ -138,8 +126,8 @@ export class FilesService {
     if (!file) throw new NotFoundException('File not found');
 
     await this.storage.delete(file.storageKey, file.externalId ?? undefined);
-    await this.prisma.file.update({
-      where: { id },
+    await this.prisma.file.updateMany({
+      where: { id, organizationId, deletedAt: null },
       data: { deletedAt: new Date() },
     });
 

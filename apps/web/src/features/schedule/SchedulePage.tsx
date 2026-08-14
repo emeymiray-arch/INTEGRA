@@ -58,7 +58,7 @@ export function SchedulePage() {
         params: {
           from: from.toISOString(),
           to: to.toISOString(),
-          limit: 200,
+          limit: 500,
           page: 1,
         },
       });
@@ -66,11 +66,17 @@ export function SchedulePage() {
     },
   });
 
-  const getAppointmentsForSlot = (date: Date, hour: number) =>
-    appointments.filter((apt) => {
+  const slots = useMemo(() => {
+    const map = new Map<string, Appointment[]>();
+    for (const apt of appointments) {
       const start = new Date(apt.startsAt);
-      return isSameDay(start, date) && start.getHours() === hour;
-    });
+      const key = `${start.getFullYear()}-${start.getMonth()}-${start.getDate()}-${start.getHours()}`;
+      const list = map.get(key);
+      if (list) list.push(apt);
+      else map.set(key, [apt]);
+    }
+    return map;
+  }, [appointments]);
 
   const shiftWeek = (delta: number) => {
     const next = new Date(weekStart);
@@ -148,7 +154,7 @@ export function SchedulePage() {
                       key={di}
                       className="min-h-[72px] border-l border-integra-gray-50 p-1"
                     >
-                      {getAppointmentsForSlot(date, hour).map((apt) => (
+                      {(slots.get(`${date.getFullYear()}-${date.getMonth()}-${date.getDate()}-${hour}`) ?? []).map((apt) => (
                         <div
                           key={apt.id}
                           className={`mb-1 cursor-pointer rounded-lg px-2 py-1.5 text-xs text-white shadow-sm ${

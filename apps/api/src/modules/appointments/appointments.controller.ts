@@ -45,7 +45,7 @@ export class AppointmentsController {
       from,
       to,
       page: clampPage(page),
-      limit: clampLimit(limit, 20, 50),
+      limit: from || to ? clampLimit(limit, 200, 500) : clampLimit(limit, 20, 50),
     });
   }
 

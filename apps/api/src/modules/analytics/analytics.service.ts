@@ -69,7 +69,10 @@ export class AnalyticsService {
 
     const services = popularRaw.length
       ? await this.prisma.service.findMany({
-          where: { id: { in: popularRaw.map((row) => row.serviceId) } },
+          where: {
+            organizationId,
+            id: { in: popularRaw.map((row) => row.serviceId) },
+          },
           select: { id: true, name: true },
         })
       : [];

@@ -131,16 +131,20 @@ export class StaffService {
     data: Prisma.StaffUpdateInput,
   ) {
     await this.findOne(organizationId, id);
-    await this.prisma.staff.update({ where: { id }, data });
+    await this.prisma.staff.updateMany({
+      where: { id, organizationId, deletedAt: null },
+      data: data as Prisma.StaffUpdateManyMutationInput,
+    });
     return this.findOne(organizationId, id);
   }
 
   async remove(organizationId: string, id: string) {
     await this.findOne(organizationId, id);
-    return this.prisma.staff.update({
-      where: { id },
+    await this.prisma.staff.updateMany({
+      where: { id, organizationId, deletedAt: null },
       data: { deletedAt: new Date(), isActive: false },
     });
+    return this.findOne(organizationId, id);
   }
 
   async assignRole(

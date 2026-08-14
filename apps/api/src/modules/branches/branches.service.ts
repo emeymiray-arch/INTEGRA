@@ -29,14 +29,19 @@ export class BranchesService {
 
   async update(organizationId: string, id: string, data: Prisma.BranchUpdateInput) {
     await this.findOne(organizationId, id);
-    return this.prisma.branch.update({ where: { id }, data });
+    await this.prisma.branch.updateMany({
+      where: { id, organizationId },
+      data: data as Prisma.BranchUpdateManyMutationInput,
+    });
+    return this.findOne(organizationId, id);
   }
 
   async remove(organizationId: string, id: string) {
     await this.findOne(organizationId, id);
-    return this.prisma.branch.update({
-      where: { id },
+    await this.prisma.branch.updateMany({
+      where: { id, organizationId },
       data: { isActive: false },
     });
+    return this.findOne(organizationId, id);
   }
 }

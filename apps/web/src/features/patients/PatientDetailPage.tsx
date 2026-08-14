@@ -18,6 +18,7 @@ import { apiClient, type Patient } from '@/shared/api/client';
 import { apiErrorMessage } from '@/shared/api/errorMessage';
 import { fullName } from '@/shared/lib/format';
 import { SelectField } from '@/shared/ui/SelectField';
+import { AuthImage } from '@/shared/ui/AuthImage';
 import { PERMISSIONS, useCan } from '@/shared/lib/permissions';
 
 interface MedicalVisit {
@@ -30,7 +31,6 @@ interface PatientFile {
   id: string;
   filename: string;
   mimeType: string;
-  previewUrl?: string;
 }
 
 export function PatientDetailPage() {
@@ -389,17 +389,7 @@ export function PatientDetailPage() {
                     key={file.id}
                     className="relative overflow-hidden rounded-xl border border-integra-gray-100"
                   >
-                    {file.previewUrl ? (
-                      <img
-                        src={file.previewUrl}
-                        alt={file.filename}
-                        className="h-36 w-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-36 items-center justify-center text-xs text-integra-gray-600">
-                        {file.filename}
-                      </div>
-                    )}
+                    <AuthImage fileId={file.id} alt={file.filename} className="h-36 w-full object-cover" />
                     <button
                       type="button"
                       className="absolute right-2 top-2 rounded-lg bg-white/90 px-2 py-1 text-xs text-integra-error"

@@ -4,7 +4,7 @@ import {
   calculateDiscount,
   DiscountType as SharedDiscountType,
 } from '@integra/shared';
-import { AppointmentStatus, DiscountType } from '@prisma/client';
+import { AppointmentStatus, DiscountType, InvoiceStatus, Prisma } from '@prisma/client';
 import { ActivityService } from '../../common/services/activity.service';
 import { PrismaService } from '../../database/prisma.service';
 
@@ -206,10 +206,12 @@ export class AppointmentsService {
       updateData = { ...updateData, discountType, discountValue, discountAmount, finalPrice };
     }
 
-    return this.prisma.appointment.update({
-      where: { id },
-      data: updateData,
+    const result = await this.prisma.appointment.updateMany({
+      where: { id, organizationId, deletedAt: null },
+      data: updateData as Prisma.AppointmentUpdateManyMutationInput,
     });
+    if (!result.count) throw new NotFoundException('Appointment not found');
+    return this.findOne(organizationId, id);
   }
 
   async changeStatus(
@@ -225,10 +227,11 @@ export class AppointmentsService {
     }
 
     const updated = await this.prisma.$transaction(async (tx) => {
-      const appt = await tx.appointment.update({
-        where: { id },
+      const appt = await tx.appointment.updateMany({
+        where: { id, organizationId, deletedAt: null },
         data: { status },
       });
+      if (!appt.count) throw new NotFoundException('Appointment not found');
 
       await tx.appointmentStatusHistory.create({
         data: {
@@ -240,7 +243,11 @@ export class AppointmentsService {
         },
       });
 
-      return appt;
+      if (status === AppointmentStatus.COMPLETED) {
+        await this.issueInvoiceInTx(tx, organizationId, userId, existing);
+      }
+
+      return tx.appointment.findFirstOrThrow({ where: { id, organizationId } });
     });
 
     const eventType =
@@ -290,8 +297,8 @@ export class AppointmentsService {
     }
 
     const newAppointment = await this.prisma.$transaction(async (tx) => {
-      await tx.appointment.update({
-        where: { id },
+      await tx.appointment.updateMany({
+        where: { id, organizationId, deletedAt: null },
         data: { status: AppointmentStatus.RESCHEDULED },
       });
 
@@ -351,9 +358,65 @@ export class AppointmentsService {
 
   async remove(organizationId: string, id: string) {
     await this.findOne(organizationId, id);
-    return this.prisma.appointment.update({
-      where: { id },
+    await this.prisma.appointment.updateMany({
+      where: { id, organizationId, deletedAt: null },
       data: { deletedAt: new Date() },
+    });
+    return { success: true };
+  }
+
+  private async issueInvoiceInTx(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+    userId: string,
+    appointment: {
+      id: string;
+      branchId: string;
+      patientId: string;
+      serviceId: string;
+      basePrice: Prisma.Decimal | number;
+      discountAmount: Prisma.Decimal | number;
+      finalPrice: Prisma.Decimal | number;
+      service?: { name?: string } | null;
+    },
+  ) {
+    const existing = await tx.invoice.findFirst({
+      where: { organizationId, appointmentId: appointment.id },
+      select: { id: true },
+    });
+    if (existing) return;
+
+    const count = await tx.invoice.count({ where: { organizationId } });
+    const totalAmount = Number(appointment.finalPrice);
+    const discountAmount = Number(appointment.discountAmount);
+    const subtotal = Number(appointment.basePrice);
+
+    await tx.invoice.create({
+      data: {
+        organizationId,
+        branchId: appointment.branchId,
+        patientId: appointment.patientId,
+        appointmentId: appointment.id,
+        number: `INV-${String(count + 1).padStart(6, '0')}`,
+        status: InvoiceStatus.ISSUED,
+        subtotal,
+        discountAmount,
+        totalAmount,
+        paidAmount: 0,
+        balance: totalAmount,
+        issuedAt: new Date(),
+        createdBy: userId,
+        items: {
+          create: {
+            serviceId: appointment.serviceId,
+            description: appointment.service?.name ?? 'Услуга',
+            quantity: 1,
+            unitPrice: subtotal,
+            discountAmount,
+            totalPrice: totalAmount,
+          },
+        },
+      },
     });
   }
 }
