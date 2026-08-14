@@ -39,17 +39,24 @@ npx --yes esbuild@0.25.0 "$API_HANDLER" \
   --outfile="$API_BUNDLE" \
   --external:@prisma/client \
   --external:.prisma/client \
+  --external:pg \
+  --external:pg-native \
   --external:@nestjs/microservices \
   '--external:@nestjs/microservices/*' \
   --external:@nestjs/websockets \
   '--external:@nestjs/websockets/*' \
   --external:class-transformer/storage
 
-# Resolve Prisma package roots from the workspace (pnpm-safe).
-PRISMA_CLIENT_DIR="$(
-  cd "$ROOT/apps/api"
-  node -e "process.stdout.write(require('path').dirname(require.resolve('@prisma/client/package.json')))"
-)"
+resolve_pkg_dir() {
+  local pkg="$1"
+  (
+    cd "$ROOT/apps/api"
+    node -e "process.stdout.write(require('path').dirname(require.resolve('${pkg}/package.json')))"
+  )
+}
+
+PRISMA_CLIENT_DIR="$(resolve_pkg_dir '@prisma/client')"
+PG_DIR="$(resolve_pkg_dir 'pg')"
 PRISMA_DOT_DIR="$(
   cd "$ROOT/apps/api"
   node <<'NODE'
@@ -59,24 +66,22 @@ const client = path.dirname(require.resolve('@prisma/client/package.json'));
 const candidates = [
   path.resolve(client, '..', '..', '.prisma', 'client'),
   path.join(client, '.prisma', 'client'),
-  path.join(client, 'node_modules', '.prisma', 'client'),
-  path.resolve(client, '..', '.prisma', 'client'),
-  path.resolve(process.cwd(), 'node_modules', '.prisma', 'client'),
   path.resolve(process.cwd(), '..', '..', 'node_modules', '.prisma', 'client'),
 ];
 for (const c of candidates) {
-  if (fs.existsSync(path.join(c, 'index.js'))) {
+  if (fs.existsSync(path.join(c, 'package.json')) || fs.existsSync(path.join(c, 'index.js'))) {
     process.stdout.write(c);
     process.exit(0);
   }
 }
-console.error('[integra] ERROR: .prisma/client not found. Tried:\n' + candidates.join('\n'));
-process.exit(1);
+// engineType=client may not create classic .prisma; that's OK
+process.exit(0);
 NODE
 )"
 
 echo "[integra] prisma client: $PRISMA_CLIENT_DIR"
-echo "[integra] prisma engine: $PRISMA_DOT_DIR"
+echo "[integra] pg: $PG_DIR"
+echo "[integra] prisma engine dir: ${PRISMA_DOT_DIR:-none}"
 
 OUT="$ROOT/.vercel/output"
 rm -rf "$OUT"
@@ -85,28 +90,28 @@ mkdir -p "$OUT/functions/api.func/node_modules/@prisma"
 mkdir -p "$OUT/functions/api.func/node_modules/.prisma"
 
 cp -R "$WEB_DIST"/. "$OUT/static/"
-
-# Self-contained serverless function (no fragile includeFiles / ../../ paths).
 cp "$API_BUNDLE" "$OUT/functions/api.func/handler.js"
 cp -R "$PRISMA_CLIENT_DIR" "$OUT/functions/api.func/node_modules/@prisma/client"
-cp -R "$PRISMA_DOT_DIR" "$OUT/functions/api.func/node_modules/.prisma/client"
+cp -R "$PG_DIR" "$OUT/functions/api.func/node_modules/pg"
+
+# pg transitive deps (minimal)
+for dep in pg-types pg-protocol pg-cloudflare pgpass postgres-array postgres-bytea postgres-date postgres-interval pg-connection-string pg-int8 pg-pool; do
+  if dep_dir="$(resolve_pkg_dir "$dep" 2>/dev/null)"; then
+    mkdir -p "$OUT/functions/api.func/node_modules"
+    cp -R "$dep_dir" "$OUT/functions/api.func/node_modules/$dep" 2>/dev/null || true
+  fi
+done
+
+if [ -n "${PRISMA_DOT_DIR:-}" ] && [ -d "$PRISMA_DOT_DIR" ]; then
+  cp -R "$PRISMA_DOT_DIR" "$OUT/functions/api.func/node_modules/.prisma/client"
+fi
 
 FUNC="$OUT/functions/api.func"
-# Drop non-runtime Prisma bulk so the function stays under Vercel's ~50MB limit.
-find "$FUNC/node_modules/@prisma/client" \
-  \( -name '*.map' -o -name '*.d.ts' -o -name '*.wasm' -o -name '*.wasm-base64.js' -o -name '*.wasm-base64.mjs' -o -name '*.md' \) \
-  -type f -delete
-find "$FUNC/node_modules/@prisma/client/runtime" -type f \( -name '*wasm*' -o -name '*.map' -o -name '*.mjs' \) -delete || true
-find "$FUNC/node_modules/.prisma/client" -type f \( \
-  -name 'libquery_engine-darwin*' -o \
-  -name '*.dylib.node' -o \
-  -name '*.wasm' -o \
-  -name '*.d.ts' -o \
-  -name '*.map' \
-\) -delete
+# Strip maps/types/docs; keep wasm/client engine files needed for engineType=client.
+find "$FUNC/node_modules" \( -name '*.map' -o -name '*.d.ts' -o -name '*.md' \) -type f -delete 2>/dev/null || true
+find "$FUNC/node_modules" -type f \( -name 'libquery_engine-darwin*' -o -name '*.dylib.node' \) -delete 2>/dev/null || true
 rm -rf "$FUNC/node_modules/@prisma/client/generator-build" \
-       "$FUNC/node_modules/@prisma/client/scripts" \
-       "$FUNC/node_modules/@prisma/client/examples" 2>/dev/null || true
+       "$FUNC/node_modules/@prisma/client/scripts" 2>/dev/null || true
 
 cat > "$OUT/functions/api.func/index.js" <<'EOF'
 'use strict';
@@ -139,7 +144,7 @@ cat > "$OUT/functions/api.func/.vc-config.json" <<'EOF'
   "runtime": "nodejs20.x",
   "handler": "index.js",
   "launcherType": "Nodejs",
-  "shouldAddHelpers": false,
+  "shouldAddHelpers": true,
   "maxDuration": 60,
   "supportsResponseStreaming": false
 }
@@ -156,13 +161,11 @@ cat > "$OUT/config.json" <<'EOF'
 }
 EOF
 
-# Keep legacy public/ for projects still using outputDirectory.
 rm -rf "$ROOT/public" "$ROOT/apps/api/public"
 mkdir -p "$ROOT/public" "$ROOT/apps/api/public"
 cp -R "$WEB_DIST"/. "$ROOT/public/"
 cp -R "$WEB_DIST"/. "$ROOT/apps/api/public/"
 
-# Legacy api handlers (unused when Build Output API is present).
 mkdir -p "$ROOT/api" "$ROOT/apps/api/api"
 cp "$OUT/functions/api.func/index.js" "$ROOT/api/index.js"
 cp "$OUT/functions/api.func/handler.js" "$ROOT/api/handler.js"
@@ -171,13 +174,10 @@ cp "$OUT/functions/api.func/handler.js" "$ROOT/apps/api/api/handler.js"
 
 echo "[integra] Build Output API ready"
 du -sh "$OUT" "$OUT/functions/api.func" "$OUT/static"
-ls -la "$OUT/functions/api.func" | head -20
 
-# Vercel Root Directory is often "apps/api" — it only reads apps/api/.vercel/output.
-# Without this copy the deploy serves nothing → NOT_FOUND / "The page could not be found".
 API_OUT="$ROOT/apps/api/.vercel/output"
 rm -rf "$API_OUT"
 mkdir -p "$ROOT/apps/api/.vercel"
 cp -R "$OUT" "$API_OUT"
-echo "[integra] mirrored Build Output to $API_OUT"
-du -sh "$API_OUT"
+SIZE="$(du -sh "$API_OUT" | awk '{print $1}')"
+echo "[integra] mirrored Build Output to $API_OUT ($SIZE)"
