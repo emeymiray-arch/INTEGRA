@@ -17,9 +17,11 @@ import {
   formatDateTime,
   fullName,
 } from '@/shared/lib/format';
+import { CreateAppointmentDialog } from './CreateAppointmentDialog';
 
 export function AppointmentsPage() {
   const [page, setPage] = useState(1);
+  const [createOpen, setCreateOpen] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['appointments', page],
@@ -77,7 +79,7 @@ export function AppointmentsPage() {
         title="Записи"
         description="Управление записями на приём"
         actions={
-          <Button>
+          <Button onClick={() => setCreateOpen(true)}>
             <Plus className="h-4 w-4" />
             Новая запись
           </Button>
@@ -93,6 +95,7 @@ export function AppointmentsPage() {
         totalPages={meta.totalPages}
         onPageChange={setPage}
       />
+      <CreateAppointmentDialog open={createOpen} onClose={() => setCreateOpen(false)} />
     </div>
   );
 }

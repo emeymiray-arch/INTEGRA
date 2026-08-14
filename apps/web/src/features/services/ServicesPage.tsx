@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import { formatMoney } from '@integra/shared';
@@ -9,8 +10,10 @@ import {
   PageHeader,
 } from '@integra/ui';
 import { apiClient, type Service } from '@/shared/api/client';
+import { CreateServiceDialog } from './CreateServiceDialog';
 
 export function ServicesPage() {
+  const [createOpen, setCreateOpen] = useState(false);
   const { data: services = [], isLoading } = useQuery({
     queryKey: ['services'],
     queryFn: async () => {
@@ -25,7 +28,7 @@ export function ServicesPage() {
         title="Услуги"
         description="Справочник услуг медицинского центра"
         actions={
-          <Button>
+          <Button onClick={() => setCreateOpen(true)}>
             <Plus className="h-4 w-4" />
             Добавить услугу
           </Button>
@@ -40,7 +43,7 @@ export function ServicesPage() {
         <EmptyState
           title="Услуги не найдены"
           description="Добавьте первую услугу в справочник"
-          action={{ label: 'Добавить услугу', onClick: () => {} }}
+          action={{ label: 'Добавить услугу', onClick: () => setCreateOpen(true) }}
         />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -74,6 +77,7 @@ export function ServicesPage() {
           ))}
         </div>
       )}
+      <CreateServiceDialog open={createOpen} onClose={() => setCreateOpen(false)} />
     </div>
   );
 }

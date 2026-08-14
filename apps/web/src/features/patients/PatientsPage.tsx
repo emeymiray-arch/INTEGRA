@@ -14,6 +14,7 @@ import {
 } from '@integra/ui';
 import { apiClient, type Patient } from '@/shared/api/client';
 import { fullName } from '@/shared/lib/format';
+import { CreatePatientDialog } from './CreatePatientDialog';
 
 const statusVariant: Record<string, 'success' | 'muted' | 'warning' | 'info'> = {
   ACTIVE: 'success',
@@ -33,6 +34,7 @@ export function PatientsPage() {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
+  const [createOpen, setCreateOpen] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['patients', page, search],
@@ -81,7 +83,7 @@ export function PatientsPage() {
         title="Пациенты"
         description="Управление карточками пациентов"
         actions={
-          <Button>
+          <Button onClick={() => setCreateOpen(true)}>
             <Plus className="h-4 w-4" />
             Новый пациент
           </Button>
@@ -104,7 +106,7 @@ export function PatientsPage() {
           icon={<Users className="h-7 w-7" />}
           title="Пациенты не найдены"
           description="Добавьте первого пациента или измените параметры поиска"
-          action={{ label: 'Добавить пациента', onClick: () => {} }}
+          action={{ label: 'Добавить пациента', onClick: () => setCreateOpen(true) }}
         />
       ) : (
         <DataTable
@@ -118,6 +120,7 @@ export function PatientsPage() {
           onRowClick={(row) => navigate(`/patients/${row.id}`)}
         />
       )}
+      <CreatePatientDialog open={createOpen} onClose={() => setCreateOpen(false)} />
     </div>
   );
 }

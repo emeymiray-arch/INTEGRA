@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Plus, UserCog } from 'lucide-react';
 import {
@@ -10,6 +11,7 @@ import {
 } from '@integra/ui';
 import { apiClient, type StaffMember } from '@/shared/api/client';
 import { fullName } from '@/shared/lib/format';
+import { CreateStaffDialog } from './CreateStaffDialog';
 
 const roleLabels: Record<string, string> = {
   ADMIN: 'Администратор',
@@ -20,11 +22,18 @@ const roleLabels: Record<string, string> = {
 };
 
 export function StaffPage() {
+  const [createOpen, setCreateOpen] = useState(false);
   const { data: staff = [], isLoading } = useQuery({
     queryKey: ['staff'],
     queryFn: async () => {
       const { data } = await apiClient.get('/staff');
-      return (data?.data ?? data ?? []) as StaffMember[];
+      const list = (data?.data ?? data ?? []) as Array<
+        StaffMember & { staffRoles?: Array<{ role: { code: string; name: string } }> }
+      >;
+      return list.map((member) => ({
+        ...member,
+        roles: member.roles ?? member.staffRoles?.map((item) => item.role),
+      }));
     },
   });
 
@@ -34,7 +43,7 @@ export function StaffPage() {
         title="Сотрудники"
         description="Управление персоналом и ролями"
         actions={
-          <Button>
+          <Button onClick={() => setCreateOpen(true)}>
             <Plus className="h-4 w-4" />
             Добавить сотрудника
           </Button>
@@ -50,7 +59,7 @@ export function StaffPage() {
           icon={<UserCog className="h-7 w-7" />}
           title="Сотрудники не найдены"
           description="Добавьте первого сотрудника"
-          action={{ label: 'Добавить', onClick: () => {} }}
+          action={{ label: 'Добавить', onClick: () => setCreateOpen(true) }}
         />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -86,6 +95,7 @@ export function StaffPage() {
           ))}
         </div>
       )}
+      <CreateStaffDialog open={createOpen} onClose={() => setCreateOpen(false)} />
     </div>
   );
 }
