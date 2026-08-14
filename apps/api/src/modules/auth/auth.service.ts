@@ -306,12 +306,28 @@ export class AuthService {
   }
 
   async validateJwtPayload(payload: JwtPayload): Promise<AuthUser> {
-    const roles = payload.roles ?? [];
+    const staff = await this.prisma.staff.findFirst({
+      where: { id: payload.staffId, deletedAt: null },
+      include: {
+        staffRoles: {
+          where: { revokedAt: null },
+          include: { role: true },
+        },
+      },
+    });
+
+    if (!staff) {
+      throw new UnauthorizedException('Staff profile not found');
+    }
+
+    const dbRoles = staff.staffRoles.map((sr) => sr.role.code as RoleCode);
+    const roles = dbRoles.length ? dbRoles : (payload.roles ?? []);
+
     return {
       userId: payload.sub,
-      staffId: payload.staffId,
-      organizationId: payload.organizationId,
-      branchId: payload.branchId,
+      staffId: staff.id,
+      organizationId: staff.organizationId,
+      branchId: staff.branchId,
       email: payload.email,
       roles,
       permissions: getPermissionsForRoles(roles),

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { AnimatePresence, motion } from 'framer-motion';
 import {
   Calendar,
   CalendarDays,
@@ -16,7 +15,6 @@ import {
 import { AppShell, Avatar, Button } from '@integra/ui';
 import { GlobalSearch } from '@/features/search/GlobalSearch';
 import { useAuthStore } from '@/shared/stores/authStore';
-import { pageTransition } from '@/shared/lib/motion';
 import { fullName } from '@/shared/lib/format';
 
 const navItems = [
@@ -104,11 +102,7 @@ export function AppLayout() {
           </div>
         }
       >
-        <AnimatePresence mode="wait">
-          <motion.div key={location.pathname} {...pageTransition}>
-            <Outlet />
-          </motion.div>
-        </AnimatePresence>
+        <Outlet />
       </AppShell>
       <GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} />
     </>
