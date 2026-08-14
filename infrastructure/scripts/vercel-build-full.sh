@@ -42,21 +42,21 @@ npx --yes esbuild@0.25.0 "$API_HANDLER" \
   --external:pg \
   --external:pg-native \
   --external:@nestjs/microservices \
-  '--external:@nestjs/microservices/*' \
+  --external:@nestjs/microservices/microservices-module \
   --external:@nestjs/websockets \
-  '--external:@nestjs/websockets/*' \
+  --external:@nestjs/websockets/socket-module \
   --external:class-transformer/storage
 
 resolve_pkg_dir() {
   local pkg="$1"
   (
     cd "$ROOT/apps/api"
-    node -e "process.stdout.write(require('path').dirname(require.resolve('${pkg}/package.json')))"
+    node -e "process.stdout.write(require('path').dirname(require.resolve(process.argv[1]+'/package.json')))" "$pkg"
   )
 }
 
-PRISMA_CLIENT_DIR="$(resolve_pkg_dir '@prisma/client')"
-PG_DIR="$(resolve_pkg_dir 'pg')"
+PRISMA_CLIENT_DIR="$(resolve_pkg_dir @prisma/client)"
+PG_DIR="$(resolve_pkg_dir pg)"
 PRISMA_DOT_DIR="$(
   cd "$ROOT/apps/api"
   node <<'NODE'
@@ -74,7 +74,6 @@ for (const c of candidates) {
     process.exit(0);
   }
 }
-// engineType=client may not create classic .prisma; that's OK
 process.exit(0);
 NODE
 )"
@@ -94,7 +93,6 @@ cp "$API_BUNDLE" "$OUT/functions/api.func/handler.js"
 cp -R "$PRISMA_CLIENT_DIR" "$OUT/functions/api.func/node_modules/@prisma/client"
 cp -R "$PG_DIR" "$OUT/functions/api.func/node_modules/pg"
 
-# pg transitive deps (minimal)
 for dep in pg-types pg-protocol pg-cloudflare pgpass postgres-array postgres-bytea postgres-date postgres-interval pg-connection-string pg-int8 pg-pool; do
   if dep_dir="$(resolve_pkg_dir "$dep" 2>/dev/null)"; then
     mkdir -p "$OUT/functions/api.func/node_modules"
@@ -107,9 +105,8 @@ if [ -n "${PRISMA_DOT_DIR:-}" ] && [ -d "$PRISMA_DOT_DIR" ]; then
 fi
 
 FUNC="$OUT/functions/api.func"
-# Strip maps/types/docs; keep wasm/client engine files needed for engineType=client.
-find "$FUNC/node_modules" \( -name '*.map' -o -name '*.d.ts' -o -name '*.md' \) -type f -delete 2>/dev/null || true
-find "$FUNC/node_modules" -type f \( -name 'libquery_engine-darwin*' -o -name '*.dylib.node' \) -delete 2>/dev/null || true
+find "$FUNC/node_modules" \( -name "*.map" -o -name "*.d.ts" -o -name "*.md" \) -type f -delete 2>/dev/null || true
+find "$FUNC/node_modules" -type f \( -name "libquery_engine-darwin*" -o -name "*.dylib.node" \) -delete 2>/dev/null || true
 rm -rf "$FUNC/node_modules/@prisma/client/generator-build" \
        "$FUNC/node_modules/@prisma/client/scripts" 2>/dev/null || true
 
@@ -179,5 +176,5 @@ API_OUT="$ROOT/apps/api/.vercel/output"
 rm -rf "$API_OUT"
 mkdir -p "$ROOT/apps/api/.vercel"
 cp -R "$OUT" "$API_OUT"
-SIZE="$(du -sh "$API_OUT" | awk '{print $1}')"
+SIZE=$(du -sh "$API_OUT" | cut -f1)
 echo "[integra] mirrored Build Output to $API_OUT ($SIZE)"
