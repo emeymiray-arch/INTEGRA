@@ -15,10 +15,17 @@ function isHealthPath(url?: string) {
   return path === '/api/health' || path === '/health';
 }
 
+function sendJson(res: Response, status: number, body: unknown) {
+  if (res.headersSent) return;
+  res.statusCode = status;
+  res.setHeader('Content-Type', 'application/json');
+  res.end(JSON.stringify(body));
+}
+
 async function sendHealth(res: Response): Promise<void> {
   const hasDbUrl = Boolean(process.env.DATABASE_URL);
   if (!hasDbUrl) {
-    res.status(503).json({
+    sendJson(res, 503, {
       ok: false,
       db: 'missing',
       message: 'База не настроена',
@@ -37,9 +44,9 @@ async function sendHealth(res: Response): Promise<void> {
     });
     await pool.query('select 1');
     await pool.end();
-    res.status(200).json({ ok: true, db: 'up' });
+    sendJson(res, 200, { ok: true, db: 'up' });
   } catch {
-    res.status(503).json({
+    sendJson(res, 503, {
       ok: false,
       db: 'down',
       message:
@@ -156,12 +163,16 @@ export default async function handler(req: Request, res: Response): Promise<void
     if (!res.headersSent) {
       res.statusCode = 500;
       res.setHeader('Content-Type', 'application/json');
+      const text = error instanceof Error ? error.message : 'unknown';
+      const secretsHint = /JWT_.*SECRET/.test(text)
+        ? ' Задайте JWT_ACCESS_SECRET и JWT_REFRESH_SECRET в Vercel (разные, от 24 символов).'
+        : '';
       res.end(
         JSON.stringify({
           data: null,
           error: {
             code: 'FUNCTION_INVOCATION_FAILED',
-            message: 'Сервис временно недоступен. Повторите вход через минуту.',
+            message: 'Сервис временно недоступен.' + secretsHint,
             url: req.url,
             method: req.method,
           },
