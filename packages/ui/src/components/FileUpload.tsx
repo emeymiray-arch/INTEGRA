@@ -42,9 +42,10 @@ export function FileUpload({
     (files: FileList | null) => {
       if (!files?.length) return;
       const valid = validateFiles(files);
+      if (!valid.length) return;
       const next = multiple ? [...selectedFiles, ...valid] : valid.slice(0, 1);
       setSelectedFiles(next);
-      onFilesSelected(next);
+      onFilesSelected(valid);
     },
     [multiple, onFilesSelected, selectedFiles, validateFiles],
   );
@@ -57,9 +58,7 @@ export function FileUpload({
   };
 
   const removeFile = (index: number) => {
-    const next = selectedFiles.filter((_, i) => i !== index);
-    setSelectedFiles(next);
-    onFilesSelected(next);
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
   return (

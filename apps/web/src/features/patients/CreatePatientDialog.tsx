@@ -1,5 +1,6 @@
 import { useForm } from 'react-hook-form';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { Button, Input, Modal } from '@integra/ui';
 import { apiClient } from '@/shared/api/client';
 import { apiErrorMessage } from '@/shared/api/errorMessage';
@@ -8,7 +9,7 @@ interface PatientForm {
   lastName: string;
   firstName: string;
   phone: string;
-  email?: string;
+  birthDate?: string;
 }
 
 interface CreatePatientDialogProps {
@@ -18,13 +19,14 @@ interface CreatePatientDialogProps {
 
 export function CreatePatientDialog({ open, onClose }: CreatePatientDialogProps) {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const {
     register,
     handleSubmit,
     reset,
     formState: { errors },
   } = useForm<PatientForm>({
-    defaultValues: { lastName: '', firstName: '', phone: '', email: '' },
+    defaultValues: { lastName: '', firstName: '', phone: '', birthDate: '' },
   });
 
   const mutation = useMutation({
@@ -33,15 +35,16 @@ export function CreatePatientDialog({ open, onClose }: CreatePatientDialogProps)
         lastName: values.lastName.trim(),
         firstName: values.firstName.trim(),
         phone: values.phone.trim(),
-        email: values.email?.trim() || undefined,
+        birthDate: values.birthDate || undefined,
       });
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (created: { id?: string }) => {
       queryClient.invalidateQueries({ queryKey: ['patients'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       reset();
       onClose();
+      if (created?.id) navigate(`/patients/${created.id}`);
     },
   });
 
@@ -50,17 +53,13 @@ export function CreatePatientDialog({ open, onClose }: CreatePatientDialogProps)
       open={open}
       onClose={onClose}
       title="Новый пациент"
-      description="Минимум — фамилия, имя и телефон"
+      description="Фамилия, имя, телефон и дата рождения"
       footer={
         <>
           <Button variant="ghost" type="button" onClick={onClose}>
             Отмена
           </Button>
-          <Button
-            type="submit"
-            form="create-patient-form"
-            loading={mutation.isPending}
-          >
+          <Button type="submit" form="create-patient-form" loading={mutation.isPending}>
             Сохранить
           </Button>
         </>
@@ -87,7 +86,7 @@ export function CreatePatientDialog({ open, onClose }: CreatePatientDialogProps)
           error={errors.phone?.message}
           {...register('phone', { required: 'Укажите телефон' })}
         />
-        <Input label="Email" type="email" {...register('email')} />
+        <Input label="Дата рождения" type="date" {...register('birthDate')} />
         {mutation.isError && (
           <p className="text-sm text-integra-error">{apiErrorMessage(mutation.error)}</p>
         )}

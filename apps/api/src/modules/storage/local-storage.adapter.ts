@@ -9,7 +9,11 @@ export class LocalStorageAdapter implements StorageProvider {
   private readonly basePath: string;
 
   constructor(config: ConfigService) {
-    this.basePath = path.resolve(config.get<string>('storage.localPath') ?? './uploads');
+    this.basePath = path.resolve(
+      process.env.VERCEL
+        ? '/tmp/uploads'
+        : (config.get<string>('storage.localPath') ?? './uploads'),
+    );
   }
 
   async upload(key: string, buffer: Buffer, _mimeType: string) {
@@ -30,5 +34,10 @@ export class LocalStorageAdapter implements StorageProvider {
 
   async getUrl(key: string) {
     return `/api/v1/files/preview/${encodeURIComponent(key)}`;
+  }
+
+  async read(key: string) {
+    const filePath = path.join(this.basePath, key);
+    return fs.readFile(filePath);
   }
 }

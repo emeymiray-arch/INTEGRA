@@ -11,20 +11,17 @@ export class MedicalRecordsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getByPatient(organizationId: string, patientId: string) {
-    const record = await this.prisma.medicalRecord.findFirst({
-      where: {
-        organizationId,
-        patientId,
-        patient: { deletedAt: null },
-      },
+    const record = await this.getOrCreateRecord(organizationId, patientId);
+    return this.prisma.medicalRecord.findFirstOrThrow({
+      where: { id: record.id },
       include: {
         patient: true,
         visits: {
           orderBy: { visitedAt: 'desc' },
           include: {
             staff: { select: { id: true, firstName: true, lastName: true } },
-            diagnoses: true,
-            recommendations: true,
+            diagnoses: { orderBy: { createdAt: 'desc' } },
+            recommendations: { orderBy: { createdAt: 'desc' } },
             measurements: true,
           },
         },
@@ -36,8 +33,96 @@ export class MedicalRecordsService {
         },
       },
     });
-    if (!record) throw new NotFoundException('Medical record not found');
-    return record;
+  }
+
+  async getOrCreateRecord(organizationId: string, patientId: string, userId?: string) {
+    const existing = await this.prisma.medicalRecord.findFirst({
+      where: { organizationId, patientId, patient: { deletedAt: null } },
+    });
+    if (existing) return existing;
+
+    const patient = await this.prisma.patient.findFirst({
+      where: { id: patientId, organizationId, deletedAt: null },
+    });
+    if (!patient) throw new NotFoundException('Patient not found');
+
+    return this.prisma.medicalRecord.create({
+      data: {
+        organizationId,
+        patientId,
+        updatedBy: userId,
+      },
+    });
+  }
+
+  async ensureTodayVisit(
+    organizationId: string,
+    patientId: string,
+    userId: string,
+    staffId: string,
+    branchId: string,
+  ) {
+    const record = await this.getOrCreateRecord(organizationId, patientId, userId);
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    const existing = await this.prisma.visit.findFirst({
+      where: {
+        organizationId,
+        medicalRecordId: record.id,
+        visitedAt: { gte: start },
+      },
+      orderBy: { visitedAt: 'desc' },
+    });
+    if (existing) return existing;
+
+    return this.prisma.visit.create({
+      data: {
+        organizationId,
+        medicalRecordId: record.id,
+        staffId,
+        branchId,
+        visitedAt: new Date(),
+        status: VisitStatus.COMPLETED,
+        chiefComplaint: 'Запись в карточке',
+        createdBy: userId,
+      },
+    });
+  }
+
+  async addPatientDiagnosis(
+    organizationId: string,
+    patientId: string,
+    userId: string,
+    staffId: string,
+    branchId: string,
+    data: { icdCode?: string; title: string; description?: string; isPrimary?: boolean },
+  ) {
+    const visit = await this.ensureTodayVisit(
+      organizationId,
+      patientId,
+      userId,
+      staffId,
+      branchId,
+    );
+    return this.addDiagnosis(organizationId, visit.id, userId, data);
+  }
+
+  async addPatientRecommendation(
+    organizationId: string,
+    patientId: string,
+    userId: string,
+    staffId: string,
+    branchId: string,
+    data: { content: string; followUpDate?: string },
+  ) {
+    const visit = await this.ensureTodayVisit(
+      organizationId,
+      patientId,
+      userId,
+      staffId,
+      branchId,
+    );
+    return this.addRecommendation(organizationId, visit.id, userId, data);
   }
 
   async createVisit(

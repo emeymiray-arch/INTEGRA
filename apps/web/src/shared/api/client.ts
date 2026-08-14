@@ -22,6 +22,9 @@ apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+    config.headers.set('Content-Type', false);
+  }
   return config;
 });
 

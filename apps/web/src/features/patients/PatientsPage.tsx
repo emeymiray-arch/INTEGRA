@@ -39,33 +39,42 @@ export function PatientsPage() {
   const { data, isLoading } = useQuery({
     queryKey: ['patients', page, search],
     queryFn: async () => {
-      const { data } = await apiClient.get('/patients', {
+      const { data } = await apiClient.get<{
+        items?: Patient[];
+        data?: Patient[];
+        page?: number;
+        limit?: number;
+        total?: number;
+        meta?: { page?: number; totalPages?: number };
+      }>('/patients', {
         params: { page, limit: 20, search: search || undefined },
       });
       return data;
     },
   });
 
-  const patients: Patient[] = data?.data ?? [];
-  const meta = data?.meta ?? { page: 1, totalPages: 1 };
+  const patients: Patient[] = Array.isArray(data)
+    ? data
+    : ((data?.items ?? data?.data ?? []) as Patient[]);
+  const meta = {
+    page: data?.page ?? data?.meta?.page ?? 1,
+    totalPages:
+      data?.meta?.totalPages ??
+      Math.max(1, Math.ceil((data?.total ?? patients.length) / (data?.limit ?? 20))),
+  };
 
   const columns: DataTableColumn<Patient>[] = [
     {
       key: 'name',
       header: 'Пациент',
-      render: (row) => (
-        <div>
-          <p className="font-medium">{fullName(row)}</p>
-          {row.birthDate && (
-            <p className="text-xs text-integra-gray-600">
-              {calculateAge(row.birthDate)} лет
-            </p>
-          )}
-        </div>
-      ),
+      render: (row) => <p className="font-medium">{fullName(row)}</p>,
     },
     { key: 'phone', header: 'Телефон' },
-    { key: 'email', header: 'Email', render: (row) => row.email ?? '—' },
+    {
+      key: 'age',
+      header: 'Возраст',
+      render: (row) => (row.birthDate ? `${calculateAge(row.birthDate)} лет` : '—'),
+    },
     {
       key: 'status',
       header: 'Статус',

@@ -48,4 +48,13 @@ export class StorageService {
   getUrl(key: string, externalId?: string) {
     return this.provider.getUrl(key, externalId);
   }
+
+  async readLocal(key: string) {
+    if (!this.provider.read) return null;
+    try {
+      return await this.provider.read(key);
+    } catch {
+      return null;
+    }
+  }
 }

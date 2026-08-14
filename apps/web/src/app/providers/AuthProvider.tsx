@@ -18,6 +18,7 @@ type MeResponse = {
   user?: AuthUser;
   staff?: AuthStaff | null;
   permissions?: string[];
+  branchId?: string;
 };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -36,7 +37,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         accessToken: current.accessToken!,
         refreshToken: current.refreshToken!,
         user: payload.user,
-        staff: payload.staff ?? current.staff,
+        staff: payload.staff
+          ? {
+              ...payload.staff,
+              branchId: payload.branchId ?? payload.staff.branchId,
+            }
+          : current.staff,
         permissions: payload.permissions ?? current.permissions,
       });
       return payload;

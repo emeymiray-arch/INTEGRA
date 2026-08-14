@@ -396,6 +396,7 @@ export class AuthService {
         middleName: staffProfile.middleName ?? undefined,
         avatarUrl: staffProfile.avatarUrl ?? undefined,
         specialization: staffProfile.specialization ?? undefined,
+        branchId: staffProfile.branchId,
       },
       permissions,
       roles,

@@ -24,11 +24,27 @@ export class FilesService {
     });
 
     return Promise.all(
-      files.map(async (file) => ({
-        ...file,
-        size: file.size.toString(),
-        previewUrl: await this.storage.getUrl(file.storageKey, file.externalId ?? undefined),
-      })),
+      files.map(async (file) => {
+        let previewUrl =
+          file.checksum?.startsWith('data:') ? file.checksum : undefined;
+        if (!previewUrl) {
+          previewUrl = await this.storage.getUrl(
+            file.storageKey,
+            file.externalId ?? undefined,
+          );
+          if (file.mimeType.startsWith('image/')) {
+            const buffer = await this.storage.readLocal(file.storageKey);
+            if (buffer) {
+              previewUrl = `data:${file.mimeType};base64,${buffer.toString('base64')}`;
+            }
+          }
+        }
+        return {
+          ...file,
+          size: file.size.toString(),
+          previewUrl,
+        };
+      }),
     );
   }
 
@@ -45,7 +61,15 @@ export class FilesService {
       file.originalname,
     );
 
-    await this.storage.upload(storageKey, file.buffer, file.mimetype);
+    try {
+      await this.storage.upload(storageKey, file.buffer, file.mimetype);
+    } catch {
+      // On Vercel the filesystem is ephemeral; the preview is stored in checksum.
+    }
+
+    const previewUrl = file.mimetype.startsWith('image/')
+      ? `data:${file.mimetype};base64,${file.buffer.toString('base64')}`
+      : undefined;
 
     const created = await this.prisma.file.create({
       data: {
@@ -57,6 +81,7 @@ export class FilesService {
         size: BigInt(file.size),
         storageProvider: this.storage.getProviderType(),
         storageKey,
+        checksum: previewUrl,
         createdBy: userId,
       },
     });
@@ -73,7 +98,7 @@ export class FilesService {
     return {
       ...created,
       size: created.size.toString(),
-      previewUrl: await this.storage.getUrl(created.storageKey),
+      previewUrl: previewUrl ?? (await this.storage.getUrl(created.storageKey)),
     };
   }
 
@@ -84,7 +109,9 @@ export class FilesService {
     if (!file) throw new NotFoundException('File not found');
 
     return {
-      url: await this.storage.getUrl(file.storageKey, file.externalId ?? undefined),
+      url: file.checksum?.startsWith('data:')
+        ? file.checksum
+        : await this.storage.getUrl(file.storageKey, file.externalId ?? undefined),
       mimeType: file.mimeType,
       filename: file.filename,
     };

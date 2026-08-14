@@ -11,4 +11,5 @@ export interface StorageProvider {
   ): Promise<StoredFile>;
   delete(key: string, externalId?: string): Promise<void>;
   getUrl(key: string, externalId?: string): Promise<string>;
+  read?(key: string, externalId?: string): Promise<Buffer>;
 }

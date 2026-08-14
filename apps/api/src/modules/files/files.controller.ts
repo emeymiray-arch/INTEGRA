@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Controller,
   Delete,
   Get,
@@ -39,13 +40,20 @@ export class FilesController {
   @Post('upload')
   @RequirePermissions(PERMISSIONS.FILES_WRITE)
   @ApiConsumes('multipart/form-data')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: { fileSize: 8 * 1024 * 1024 },
+    }),
+  )
   upload(
     @CurrentUser() user: AuthUser,
     @Query('entityType') entityType: string,
     @Query('entityId') entityId: string,
     @UploadedFile() file: Express.Multer.File,
   ) {
+    if (!file?.buffer) {
+      throw new BadRequestException('Выберите фото для загрузки');
+    }
     return this.filesService.upload(
       user.organizationId,
       user.userId,

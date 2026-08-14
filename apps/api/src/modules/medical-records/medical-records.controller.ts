@@ -9,6 +9,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { IsBoolean, IsOptional, IsString } from 'class-validator';
 import { TreatmentPlanStatus, VisitStatus } from '@prisma/client';
 import { PERMISSIONS } from '@integra/shared';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -17,6 +18,32 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { AuthUser } from '../../common/types/auth-user.interface';
 import { MedicalRecordsService } from './medical-records.service';
+
+class AddDiagnosisDto {
+  @IsOptional()
+  @IsString()
+  icdCode?: string;
+
+  @IsString()
+  title!: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isPrimary?: boolean;
+}
+
+class AddRecommendationDto {
+  @IsString()
+  content!: string;
+
+  @IsOptional()
+  @IsString()
+  followUpDate?: string;
+}
 
 @ApiTags('medical-records')
 @ApiBearerAuth()
@@ -29,6 +56,40 @@ export class MedicalRecordsController {
   @RequirePermissions(PERMISSIONS.MEDICAL_READ)
   getByPatient(@CurrentUser() user: AuthUser, @Param('patientId') patientId: string) {
     return this.medicalRecordsService.getByPatient(user.organizationId, patientId);
+  }
+
+  @Post('patient/:patientId/diagnoses')
+  @RequirePermissions(PERMISSIONS.MEDICAL_WRITE)
+  addPatientDiagnosis(
+    @CurrentUser() user: AuthUser,
+    @Param('patientId') patientId: string,
+    @Body() dto: AddDiagnosisDto,
+  ) {
+    return this.medicalRecordsService.addPatientDiagnosis(
+      user.organizationId,
+      patientId,
+      user.userId,
+      user.staffId,
+      user.branchId,
+      dto,
+    );
+  }
+
+  @Post('patient/:patientId/recommendations')
+  @RequirePermissions(PERMISSIONS.MEDICAL_WRITE)
+  addPatientRecommendation(
+    @CurrentUser() user: AuthUser,
+    @Param('patientId') patientId: string,
+    @Body() dto: AddRecommendationDto,
+  ) {
+    return this.medicalRecordsService.addPatientRecommendation(
+      user.organizationId,
+      patientId,
+      user.userId,
+      user.staffId,
+      user.branchId,
+      dto,
+    );
   }
 
   @Post(':recordId/visits')

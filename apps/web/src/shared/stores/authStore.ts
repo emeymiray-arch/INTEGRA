@@ -14,6 +14,7 @@ export interface AuthStaff {
   middleName?: string;
   avatarUrl?: string;
   specialization?: string;
+  branchId?: string;
 }
 
 export interface AuthState {
