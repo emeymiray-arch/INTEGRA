@@ -105,10 +105,28 @@ if [ -n "${PRISMA_DOT_DIR:-}" ] && [ -d "$PRISMA_DOT_DIR" ]; then
 fi
 
 FUNC="$OUT/functions/api.func"
+# Keep only PostgreSQL client-engine assets; drop other DB wasms + rust binaries.
 find "$FUNC/node_modules" \( -name "*.map" -o -name "*.d.ts" -o -name "*.md" \) -type f -delete 2>/dev/null || true
-find "$FUNC/node_modules" -type f \( -name "libquery_engine-darwin*" -o -name "*.dylib.node" \) -delete 2>/dev/null || true
+find "$FUNC/node_modules" -type f \( \
+  -name "libquery_engine-*" -o \
+  -name "*.dylib.node" -o \
+  -name "*.so.node" -o \
+  -name "*cockroachdb*" -o \
+  -name "*mysql*" -o \
+  -name "*sqlserver*" -o \
+  -name "*sqlite*" -o \
+  -name "binary.js" -o \
+  -name "binary.mjs" -o \
+  -name "react-native.js" -o \
+  -name "edge.js" -o \
+  -name "edge.mjs" -o \
+  -name "wasm-compiler-edge.*" \
+\) -delete 2>/dev/null || true
+# Prefer .js over duplicate .mjs wasm payloads where both exist.
+find "$FUNC/node_modules/@prisma/client/runtime" -type f -name "*.mjs" -delete 2>/dev/null || true
 rm -rf "$FUNC/node_modules/@prisma/client/generator-build" \
        "$FUNC/node_modules/@prisma/client/scripts" 2>/dev/null || true
+du -sh "$FUNC"
 
 cat > "$OUT/functions/api.func/index.js" <<'EOF'
 'use strict';
