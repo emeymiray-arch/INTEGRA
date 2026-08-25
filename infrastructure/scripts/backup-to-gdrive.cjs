@@ -41,6 +41,8 @@ function normalizeFolderId(raw) {
   if (fromUrl) return fromUrl[1];
   const fromQuery = value.match(/[?&]id=([a-zA-Z0-9_-]+)/);
   if (fromQuery) return fromQuery[1];
+  // Common mistake: paste "FOLDER_ID?usp=sharing" without the full URL.
+  value = value.split(/[?#]/)[0];
   value = value.replace(/["'\s]/g, '');
   const onlyId = value.match(/^[a-zA-Z0-9_-]+$/);
   return onlyId ? onlyId[0] : value;
