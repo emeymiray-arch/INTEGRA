@@ -88,3 +88,6 @@ cd apps/api && npx prisma db push && npx prisma db seed
 
 - [Архитектура v2.0](docs/ARCHITECTURE.md)
 - [Design System](docs/DESIGN-SYSTEM.md)
+- [Google Drive: файлы и восстановление](docs/DRIVE.md)
+- [Передача клинике](docs/PEREDACHA.md)
+- [Timeweb PostgreSQL](docs/TIMEWEB.md)

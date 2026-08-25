@@ -11,23 +11,42 @@ import { StorageProvider } from './storage-provider.interface';
 export class StorageService {
   private readonly provider: StorageProvider;
   private readonly providerType: PrismaStorageProvider;
+  private readonly driveAdapter: GoogleDriveAdapter | null;
 
   constructor(
     config: ConfigService,
     localAdapter: LocalStorageAdapter,
-    _googleDriveAdapter: GoogleDriveAdapter,
+    googleDriveAdapter: GoogleDriveAdapter,
   ) {
     const providerName = config.get<string>('storage.provider') ?? 'local';
-    // Drive is wired later. Never throw on upload if the env is flipped too early.
-    if (providerName === 'google_drive') {
-      console.warn('[INTEGRA] STORAGE_PROVIDER=google_drive is not live yet; using local+checksum');
+    const wantDrive = providerName === 'google_drive';
+
+    if (wantDrive && googleDriveAdapter.isConfigured()) {
+      this.provider = googleDriveAdapter;
+      this.providerType = PrismaStorageProvider.GOOGLE_DRIVE;
+      this.driveAdapter = googleDriveAdapter;
+    } else {
+      if (wantDrive) {
+        console.warn(
+          '[INTEGRA] STORAGE_PROVIDER=google_drive but service account / folder is incomplete; using local+checksum',
+        );
+      }
+      this.provider = localAdapter;
+      this.providerType = PrismaStorageProvider.LOCAL;
+      this.driveAdapter = null;
     }
-    this.provider = localAdapter;
-    this.providerType = PrismaStorageProvider.LOCAL;
   }
 
   getProviderType(): PrismaStorageProvider {
     return this.providerType;
+  }
+
+  usesGoogleDrive(): boolean {
+    return this.providerType === PrismaStorageProvider.GOOGLE_DRIVE;
+  }
+
+  getDriveAdapter(): GoogleDriveAdapter | null {
+    return this.driveAdapter;
   }
 
   buildStorageKey(organizationId: string, entityType: string, filename: string) {
@@ -48,10 +67,10 @@ export class StorageService {
     return this.provider.getUrl(key, externalId);
   }
 
-  async readLocal(key: string) {
+  async readLocal(key: string, externalId?: string) {
     if (!this.provider.read) return null;
     try {
-      return await this.provider.read(key);
+      return await this.provider.read(key, externalId);
     } catch {
       return null;
     }

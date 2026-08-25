@@ -54,8 +54,10 @@ export class FilesService {
       file.originalname,
     );
 
+    let externalId: string | undefined;
     try {
-      await this.storage.upload(storageKey, file.buffer, file.mimetype);
+      const stored = await this.storage.upload(storageKey, file.buffer, file.mimetype);
+      externalId = stored.externalId;
     } catch {
       // On Vercel the filesystem is ephemeral; the preview is stored in checksum.
     }
@@ -74,6 +76,7 @@ export class FilesService {
         size: BigInt(file.size),
         storageProvider: this.storage.getProviderType(),
         storageKey,
+        externalId: externalId ?? null,
         checksum: previewUrl,
         createdBy: userId,
       },
@@ -88,10 +91,15 @@ export class FilesService {
       metadata: { parentEntityType: entityType, parentEntityId: entityId },
     });
 
+    const driveUrl =
+      externalId != null
+        ? await this.storage.getUrl(created.storageKey, externalId)
+        : '';
+
     return {
       ...created,
       size: created.size.toString(),
-      previewUrl: previewUrl ?? (await this.storage.getUrl(created.storageKey)),
+      previewUrl: previewUrl ?? (driveUrl || (await this.storage.getUrl(created.storageKey))),
     };
   }
 
@@ -104,13 +112,22 @@ export class FilesService {
     if (file.checksum?.startsWith('data:')) {
       return { url: file.checksum, mimeType: file.mimeType, filename: file.filename };
     }
-    const buffer = await this.storage.readLocal(file.storageKey);
+    const buffer = await this.storage.readLocal(
+      file.storageKey,
+      file.externalId ?? undefined,
+    );
     if (buffer && file.mimeType.startsWith('image/')) {
       return {
         url: `data:${file.mimeType};base64,${buffer.toString('base64')}`,
         mimeType: file.mimeType,
         filename: file.filename,
       };
+    }
+    if (file.externalId) {
+      const driveUrl = await this.storage.getUrl(file.storageKey, file.externalId);
+      if (driveUrl) {
+        return { url: driveUrl, mimeType: file.mimeType, filename: file.filename };
+      }
     }
     return {
       url: `/api/v1/files/${file.id}/preview`,

@@ -14,9 +14,11 @@ export default () => ({
     provider: process.env.STORAGE_PROVIDER ?? 'local',
     localPath: process.env.STORAGE_LOCAL_PATH ?? './uploads',
     googleDrive: {
+      folderId: process.env.GOOGLE_DRIVE_FOLDER_ID ?? '',
+      /** Full service-account JSON string, or base64 of that JSON */
+      serviceAccountJson: process.env.GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON ?? '',
       clientId: process.env.GOOGLE_DRIVE_CLIENT_ID ?? '',
       clientSecret: process.env.GOOGLE_DRIVE_CLIENT_SECRET ?? '',
-      folderId: process.env.GOOGLE_DRIVE_FOLDER_ID ?? '',
     },
   },
 });

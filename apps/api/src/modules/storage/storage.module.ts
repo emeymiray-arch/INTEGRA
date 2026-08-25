@@ -5,6 +5,6 @@ import { StorageService } from './storage.service';
 
 @Module({
   providers: [LocalStorageAdapter, GoogleDriveAdapter, StorageService],
-  exports: [StorageService, LocalStorageAdapter],
+  exports: [StorageService, LocalStorageAdapter, GoogleDriveAdapter],
 })
 export class StorageModule {}
