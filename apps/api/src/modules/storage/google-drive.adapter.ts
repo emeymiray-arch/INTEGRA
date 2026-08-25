@@ -41,7 +41,7 @@ export class GoogleDriveAdapter implements StorageProvider {
     const auth = new google.auth.JWT({
       email: this.credentials.client_email,
       key: this.credentials.private_key,
-      scopes: ['https://www.googleapis.com/auth/drive.file'],
+      scopes: ['https://www.googleapis.com/auth/drive'],
     });
     this.driveClient = google.drive({ version: 'v3', auth });
     return this.driveClient;
