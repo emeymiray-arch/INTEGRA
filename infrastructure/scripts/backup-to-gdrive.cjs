@@ -319,18 +319,32 @@ async function main() {
   const dayId = await ensureChildFolder(drive, backupsId, dateFolder);
 
   console.log(`[backup] Uploading to Drive backups/${dateFolder}/${dumpName}`);
-  const created = await drive.files.create({
-    requestBody: {
-      name: dumpName,
-      parents: [dayId],
-    },
-    media: {
-      mimeType: 'application/gzip',
-      body: Readable.from(buffer),
-    },
-    fields: 'id, name',
-    supportsAllDrives: true,
-  });
+  let created;
+  try {
+    created = await drive.files.create({
+      requestBody: {
+        name: dumpName,
+        parents: [dayId],
+      },
+      media: {
+        mimeType: 'application/gzip',
+        body: Readable.from(buffer),
+      },
+      fields: 'id, name',
+      supportsAllDrives: true,
+    });
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    if (/storage quota|shared drives/i.test(msg)) {
+      fail(
+        `Google blocks Service Account uploads into personal "My Drive" folders (no SA storage quota). ` +
+          `Create a Shared drive (Общий диск), add ${credentials.client_email} as Content manager, ` +
+          `put a folder there, set GOOGLE_DRIVE_FOLDER_ID to that folder id. ` +
+          `Personal Gmail cannot create Shared drives — need Google Workspace, or switch storage. Details: ${msg}`,
+      );
+    }
+    fail(msg);
+  }
 
   console.log(`[backup] Uploaded file id=${created.data.id}`);
 
