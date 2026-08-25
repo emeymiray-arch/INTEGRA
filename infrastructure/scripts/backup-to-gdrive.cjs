@@ -90,10 +90,26 @@ async function ensureChildFolder(drive, parentId, name) {
   return created.data.id;
 }
 
+function resolvePgDumpBin() {
+  const candidates = [
+    '/usr/lib/postgresql/18/bin/pg_dump',
+    '/usr/lib/postgresql/17/bin/pg_dump',
+    '/usr/lib/postgresql/16/bin/pg_dump',
+    'pg_dump',
+  ];
+  for (const bin of candidates) {
+    if (bin === 'pg_dump') return bin;
+    if (fs.existsSync(bin)) return bin;
+  }
+  return 'pg_dump';
+}
+
 function dumpDatabase(databaseUrl, dumpPath) {
+  const pgDumpBin = resolvePgDumpBin();
+  console.log(`[backup] Using ${pgDumpBin}`);
   // Prefer direct argv to avoid shell quoting issues with special chars in URL.
   const pgDump = spawnSync(
-    'pg_dump',
+    pgDumpBin,
     [
       databaseUrl,
       '--no-owner',
