@@ -55,7 +55,21 @@ function parseServiceAccountJson(raw) {
     try {
       const parsed = JSON.parse(candidate);
       if (parsed.private_key && typeof parsed.private_key === 'string') {
-        parsed.private_key = parsed.private_key.replace(/\\n/g, '\n');
+        let key = parsed.private_key;
+        // GitHub/Vercel pastes often flatten or double-escape newlines.
+        key = key.replace(/\\n/g, '\n');
+        key = key.replace(/\r\n/g, '\n');
+        if (!key.includes('\n') && key.includes('-----BEGIN')) {
+          key = key
+            .replace('-----BEGIN PRIVATE KEY-----', '-----BEGIN PRIVATE KEY-----\n')
+            .replace('-----END PRIVATE KEY-----', '\n-----END PRIVATE KEY-----\n')
+            .replace(/-----BEGIN PRIVATE KEY-----\n([\s\S]+)\n-----END PRIVATE KEY-----/, (_, body) => {
+              const compact = body.replace(/\s+/g, '');
+              const lines = compact.match(/.{1,64}/g) || [];
+              return `-----BEGIN PRIVATE KEY-----\n${lines.join('\n')}\n-----END PRIVATE KEY-----\n`;
+            });
+        }
+        parsed.private_key = key;
       }
       if (parsed.client_email && parsed.private_key) return parsed;
     } catch {
@@ -203,7 +217,9 @@ async function main() {
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     fail(
-      `Cannot open Drive folder ${folderId}. Share the folder with ${credentials.client_email} as Editor. Details: ${msg}`,
+      `Cannot open Drive folder ${folderId}. ` +
+        `If error is "Invalid JWT Signature" — recreate the service account JSON key and paste the NEW file into GitHub secret GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON (and Vercel). ` +
+        `Otherwise share the folder with ${credentials.client_email} as Editor. Details: ${msg}`,
     );
   }
 
