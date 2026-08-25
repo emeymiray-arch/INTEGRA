@@ -33,13 +33,28 @@ function fail(message) {
 }
 
 function normalizeFolderId(raw) {
-  const value = (raw || '').trim();
+  let value = (raw || '').trim();
+  // Secrets pasted from browsers/Docs sometimes include BOM / zero-width chars.
+  value = value.replace(/^\uFEFF/, '').replace(/[\u200B-\u200D\uFEFF]/g, '');
   if (!value) return '';
   const fromUrl = value.match(/\/folders\/([a-zA-Z0-9_-]+)/);
   if (fromUrl) return fromUrl[1];
   const fromQuery = value.match(/[?&]id=([a-zA-Z0-9_-]+)/);
   if (fromQuery) return fromQuery[1];
-  return value.replace(/["']/g, '');
+  value = value.replace(/["'\s]/g, '');
+  const onlyId = value.match(/^[a-zA-Z0-9_-]+$/);
+  return onlyId ? onlyId[0] : value;
+}
+
+async function listSharedFolders(drive) {
+  const shared = await drive.files.list({
+    q: "sharedWithMe = true and trashed = false and mimeType = 'application/vnd.google-apps.folder'",
+    fields: 'files(id, name)',
+    pageSize: 50,
+    supportsAllDrives: true,
+    includeItemsFromAllDrives: true,
+  });
+  return shared.data.files || [];
 }
 
 function parseServiceAccountJson(raw) {
@@ -208,23 +223,97 @@ async function main() {
   });
   const drive = google.drive({ version: 'v3', auth });
 
+  // Confirm auth works before blaming the folder id.
   try {
-    await drive.files.get({
-      fileId: folderId,
-      fields: 'id, name, mimeType',
-      supportsAllDrives: true,
-    });
+    const about = await drive.about.get({ fields: 'user(emailAddress,displayName)' });
+    console.log(
+      `[backup] Drive auth OK as ${about.data.user?.emailAddress || credentials.client_email}`,
+    );
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
+    fail(`Drive auth failed before opening folder. Details: ${msg}`);
+  }
+
+  console.log(
+    `[backup] Folder id length=${folderId.length} prefix=${folderId.slice(0, 4)}…`,
+  );
+  if (!/^[a-zA-Z0-9_-]{10,}$/.test(folderId)) {
     fail(
-      `Cannot open Drive folder ${folderId}. ` +
-        `If error is "Invalid JWT Signature" — recreate the service account JSON key and paste the NEW file into GitHub secret GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON (and Vercel). ` +
-        `Otherwise share the folder with ${credentials.client_email} as Editor. Details: ${msg}`,
+      `GOOGLE_DRIVE_FOLDER_ID looks invalid (${folderId.length} chars). ` +
+        `Put only the id from …/folders/THIS_PART (or the full folder URL).`,
     );
   }
 
+  let rootFolderId = folderId;
+
+  try {
+    const meta = await drive.files.get({
+      fileId: rootFolderId,
+      fields: 'id, name, mimeType, driveId, shortcutDetails',
+      supportsAllDrives: true,
+    });
+    console.log(
+      `[backup] Opened Drive item "${meta.data.name}" (${meta.data.mimeType})`,
+    );
+    if (meta.data.mimeType === 'application/vnd.google-apps.shortcut') {
+      const target = meta.data.shortcutDetails?.targetId;
+      fail(
+        `GOOGLE_DRIVE_FOLDER_ID points to a shortcut, not a folder. ` +
+          `Open the real folder and copy its URL id` +
+          (target ? ` (shortcut target id=${target})` : '') +
+          '.',
+      );
+    }
+    if (meta.data.mimeType !== 'application/vnd.google-apps.folder') {
+      fail(
+        `GOOGLE_DRIVE_FOLDER_ID is a file (${meta.data.mimeType}), not a folder.`,
+      );
+    }
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    let folders = [];
+    try {
+      folders = await listSharedFolders(drive);
+    } catch {
+      // ignore listing errors; keep original failure
+    }
+    const visible = folders.map((f) => `${f.name}=${f.id}`);
+    const matched = folders.find((f) => f.id === folderId);
+    const byName = folders.find(
+      (f) => (f.name || '').toLowerCase() === 'integra',
+    );
+
+    if (matched?.id) {
+      console.log(
+        `[backup] files.get failed (${msg}), but folder is in sharedWithMe — continuing with ${matched.name}`,
+      );
+      rootFolderId = matched.id;
+    } else if (byName?.id) {
+      console.log(
+        `[backup] Configured id not visible (${msg}). Falling back to shared folder "${byName.name}" (${byName.id})`,
+      );
+      rootFolderId = byName.id;
+    } else if (folders.length === 1 && folders[0].id) {
+      console.log(
+        `[backup] Configured id not visible (${msg}). Falling back to only shared folder "${folders[0].name}" (${folders[0].id})`,
+      );
+      rootFolderId = folders[0].id;
+    } else {
+      const hint =
+        visible.length > 0
+          ? `Folders visible to the service account: ${visible.join(' | ')}. ` +
+            `Put one of these ids into GOOGLE_DRIVE_FOLDER_ID.`
+          : `Service account sees ZERO shared folders. In Drive → folder → Share, add exactly ` +
+            `${credentials.client_email} as Editor (uncheck Notify). ` +
+            `If sharing is blocked by Google Workspace, create a Shared drive, add the SA as Content manager, use that folder id.`;
+      fail(
+        `Cannot open Drive folder (id length ${folderId.length}). Details: ${msg}. ${hint}`,
+      );
+    }
+  }
+
   console.log('[backup] Creating backups/ date folders if needed');
-  const backupsId = await ensureChildFolder(drive, folderId, 'backups');
+  const backupsId = await ensureChildFolder(drive, rootFolderId, 'backups');
   const dayId = await ensureChildFolder(drive, backupsId, dateFolder);
 
   console.log(`[backup] Uploading to Drive backups/${dateFolder}/${dumpName}`);
