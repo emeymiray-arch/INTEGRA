@@ -16,7 +16,13 @@ const { spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const { Readable } = require('stream');
-const { google } = require('googleapis');
+const { createRequire } = require('module');
+
+// googleapis lives in apps/api (pnpm workspace); resolve from there.
+const requireFromApi = createRequire(
+  path.join(__dirname, '../../apps/api/package.json'),
+);
+const { google } = requireFromApi('googleapis');
 
 const ROOT = path.resolve(__dirname, '../..');
 const BACKUP_DIR = process.env.BACKUP_DIR || path.join(ROOT, 'backups');
