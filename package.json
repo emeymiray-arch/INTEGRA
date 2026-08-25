@@ -12,7 +12,7 @@
     "db:seed": "pnpm --filter @integra/api db:seed",
     "db:studio": "pnpm --filter @integra/api db:studio",
     "db:timeweb": "node infrastructure/scripts/timeweb-setup.mjs",
-    "db:backup": "node infrastructure/scripts/backup-to-gdrive.mjs"
+    "db:backup": "node infrastructure/scripts/backup-to-gdrive.cjs"
   },
   "devDependencies": {
     "turbo": "^2.5.4",
